@@ -120,6 +120,96 @@ if ($authValidationErrors.Count -eq 0 -and $routeCount -gt 0) {
     exit 1
 }
 
+# Validate caching configuration
+Write-Host "3. Validating caching configuration..." -ForegroundColor Yellow
+
+$cacheValidationErrors = @()
+$routesWithCache = 0
+
+# Check each route for proxy-cache plugin
+foreach ($provider in $providers) {
+    $servicePattern = "- name: $provider"
+    $serviceIndex = $yamlContent.IndexOf($servicePattern)
+    
+    if ($serviceIndex -ge 0) {
+        $nextServiceIndex = $yamlContent.IndexOf("- name:", $serviceIndex + 1)
+        if ($nextServiceIndex -eq -1) { $nextServiceIndex = $yamlContent.Length }
+        
+        $serviceSection = $yamlContent.Substring($serviceIndex, $nextServiceIndex - $serviceIndex)
+        $routesInService = [regex]::Matches($serviceSection, "- name: llm\.$provider\.\S+")
+        
+        foreach ($routeMatch in $routesInService) {
+            $routeName = $routeMatch.Value -replace "- name: ", ""
+            
+            $routeIndex = $serviceSection.IndexOf($routeMatch.Value)
+            $nextRouteIndex = $serviceSection.IndexOf("- name: llm.", $routeIndex + 1)
+            if ($nextRouteIndex -eq -1) { $nextRouteIndex = $serviceSection.Length }
+            
+            $routeSection = $serviceSection.Substring($routeIndex, $nextRouteIndex - $routeIndex)
+            
+            # Check for pre-function plugin (cache key generation)
+            if ($routeSection -notmatch "name: pre-function") {
+                $cacheValidationErrors += "Route '$routeName' missing pre-function plugin for cache key generation"
+            }
+            
+            # Check for proxy-cache plugin
+            if ($routeSection -notmatch "name: proxy-cache") {
+                $cacheValidationErrors += "Route '$routeName' missing proxy-cache plugin"
+            } else {
+                $routesWithCache++
+                
+                # Check for Redis configuration in proxy-cache
+                if ($routeSection -notmatch "strategy: redis") {
+                    $cacheValidationErrors += "Route '$routeName' proxy-cache not configured with Redis strategy"
+                }
+                
+                # Check for TTL configuration
+                if ($routeSection -notmatch "cache_ttl: 86400") {
+                    $cacheValidationErrors += "Route '$routeName' proxy-cache missing or incorrect TTL (expected: 86400)"
+                }
+            }
+            
+            # Check for post-function plugin (cache headers)
+            if ($routeSection -notmatch "name: post-function") {
+                $cacheValidationErrors += "Route '$routeName' missing post-function plugin for cache headers"
+            }
+        }
+    }
+}
+
+# Check for cache Lua functions
+$cacheFunctionsExist = $true
+$cacheKeyLua = "gateway/plugins/llm-cache-key.lua"
+$cacheHeadersLua = "gateway/plugins/llm-cache-headers.lua"
+
+if (-not (Test-Path $cacheKeyLua)) {
+    $cacheValidationErrors += "Missing cache key generator: $cacheKeyLua"
+    $cacheFunctionsExist = $false
+}
+
+if (-not (Test-Path $cacheHeadersLua)) {
+    $cacheValidationErrors += "Missing cache headers function: $cacheHeadersLua"
+    $cacheFunctionsExist = $false
+}
+
+# Report cache validation results
+if ($cacheValidationErrors.Count -eq 0 -and $routesWithCache -gt 0) {
+    Write-Host "✓ Found $routesWithCache routes with caching configured" -ForegroundColor Green
+    Write-Host "✓ All routes have pre-function (cache key generation)" -ForegroundColor Green
+    Write-Host "✓ All routes have proxy-cache plugin with Redis" -ForegroundColor Green
+    Write-Host "✓ All routes have post-function (cache headers)" -ForegroundColor Green
+    Write-Host "✓ Cache TTL configured correctly (24h)" -ForegroundColor Green
+    if ($cacheFunctionsExist) {
+        Write-Host "✓ Cache Lua functions exist" -ForegroundColor Green
+    }
+} elseif ($cacheValidationErrors.Count -gt 0) {
+    Write-Host "✗ Cache validation failed with $($cacheValidationErrors.Count) error(s):" -ForegroundColor Red
+    foreach ($cacheError in $cacheValidationErrors) {
+        Write-Host "  - $cacheError" -ForegroundColor Red
+    }
+    exit 1
+}
+
 Write-Host ""
 
 if (Get-Command conftest -ErrorAction SilentlyContinue) {
