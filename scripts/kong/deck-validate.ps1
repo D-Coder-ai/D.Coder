@@ -10,11 +10,12 @@ if (-not (Test-Path $StatePath)) {
 if (Get-Command conftest -ErrorAction SilentlyContinue) {
   Write-Host "Running conftest policy checks..."
   # Test the combined file that includes both services and allowed_hosts
-  conftest test "infra/kong/kong-with-allowlist.yaml" -p "infra/policies"
+  conftest test "infra/kong/kong-with-allowlist.yaml" -p "infra/policies" --all-namespaces
   if ($LASTEXITCODE -ne 0) {
     Write-Error "Conftest policy validation failed!"
     exit 1
   }
+  Write-Host "✅ Policy validation passed - all hosts are allowlisted"
 } else {
   Write-Host "conftest not found. Skipping policy checks."
 }
