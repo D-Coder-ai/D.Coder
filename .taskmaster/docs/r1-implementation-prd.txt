@@ -1,0 +1,773 @@
+# D.Coder LLM Platform - Release R1 (Beta/MVP) Implementation PRD
+
+## Project Overview
+D.Coder is an enterprise-grade, AI-native LLM platform designed for multi-tenant deployments with a focus on cost optimization (70% reduction through semantic caching), security, and extensibility. Initial tenant: Deloitte USI IGS.
+
+## Technical Stack & Constraints
+- Architecture: Macro-services with hexagonal/ports-adapters pattern (already scaffolded)
+- Backend: FastAPI (Python) for all API services
+- Gateway: Kong AI Gateway 3.11+ with AI-native features
+- Database: PostgreSQL (per-tenant isolation) + pgvector for embeddings
+- Cache: Redis for semantic caching and session storage
+- Storage: MinIO (S3-compatible) for documents and artifacts
+- Auth: Logto (OIDC/SSO)
+- Feature Flags: Flagsmith
+- Orchestration: Temporal for durable workflows
+- Events: NATS JetStream
+- Observability: Grafana Loki, Prometheus, OpenTelemetry, Langfuse
+- UI: Open WebUI instances + Next.js dashboards
+- Deployment: Docker Compose (MVP), Kubernetes-ready
+
+## R1 Scope Constraints
+- BYO LLM per tenant (OpenAI, Anthropic, Google/Vertex, Groq)
+- No local/on-prem inference
+- Database-per-tenant isolation
+- Guardrails: alert-only (no blocking)
+- Quotas: enforce at Kong + mirror in Platform API
+- No automatic provider failover
+- SSO via Logto, feature flags via Flagsmith
+- Backups: daily encrypted; RPO 24h, RTO 4h
+- Plugins: scaffold only, no mandatory connectors
+
+## Global Conventions (All Services)
+- API versioning: `/v1`
+- Headers: X-Request-Id, X-Tenant-Id, X-Platform-Id, X-User-Id, X-Trace-Id
+- Pagination: cursor-based with limit parameter
+- Error envelope: { error: { code, message, details } }
+- Events: NATS subjects as domain.action with standard envelope
+- Idempotency: Idempotency-Key header support
+- Observability: OTel traces with tenant/platform labels; redacted logs
+- Configuration: Platform-level defaults + tenant-level overrides
+
+## Service 1: AI Gateway (Kong AI Gateway)
+
+### Responsibilities
+- Multi-LLM routing (OpenAI, Anthropic, Google/Vertex, Groq)
+- Semantic caching (40-60% token reduction via Redis)
+- Prompt compression (20-30% size reduction)
+- Rate limiting per tenant
+- Alert-only guardrails (prompt injection, DLP detection)
+- Quota enforcement with event emission to Platform API
+- MCP server generation capabilities
+
+### Configuration Requirements
+- Per-tenant route namespacing: llm.{provider}.{model}
+- Redis backend for semantic cache
+- PostgreSQL for gateway configuration and audit logs
+- Provider endpoint allowlisting
+- No automatic failover routing in R1
+
+### Deliverables
+- Kong AI Gateway deployed and configured (Port 8000)
+- Redis cache integration with TTL policies
+- Per-tenant provider routing configuration
+- Rate limiting plugins configured per tenant
+- Guardrail plugins installed (LlamaGuard or LLM Guard) - detect mode only
+- Quota counter implementation with NATS event emission (quota.updated)
+- Health check endpoints
+- Prometheus metrics export
+- Documentation: Kong configuration guide, provider onboarding
+
+### Integration Points
+- Downstream: All LLM provider APIs (OpenAI, Anthropic, Google, Groq)
+- Upstream: Platform API (quota sync), NATS (events)
+- Cache: Redis (semantic cache)
+- DB: PostgreSQL (config, audit)
+
+## Service 2: LLMOps Platform (Agenta + MLFlow + Langfuse)
+
+### Responsibilities
+- Visual prompt playground (Agenta)
+- A/B testing for prompt variants
+- Evaluation frameworks (LLM-as-judge, custom metrics)
+- Prompt version control
+- Experiment tracking (MLFlow)
+- LLM observability (Langfuse)
+- Human-in-the-loop evaluation
+
+### Configuration Requirements
+- Agenta (MIT license) as primary tool
+- MLFlow for experiment tracking and artifact storage
+- Langfuse for production LLM observability
+- MinIO backend for artifact storage
+- PostgreSQL for metadata
+
+### Deliverables
+- Agenta deployed and configured (Port 8081)
+- MLFlow tracking server deployed
+- Langfuse observability dashboard deployed
+- MinIO integration for model artifacts
+- Prompt template library with versioning
+- Evaluation pipeline with custom metrics
+- Integration with Kong Gateway for production deployments
+- Multi-tenant workspace separation
+- Documentation: LLMOps workflow guide, evaluation best practices
+
+### Integration Points
+- Upstream: Kong AI Gateway (prompt deployment)
+- Storage: MinIO (artifacts), PostgreSQL (metadata)
+- Downstream: All configured LLM providers
+
+## Service 3: Platform API (FastAPI)
+
+### Responsibilities
+- Multi-tenancy management (org/group/user hierarchy)
+- Tenant onboarding with database provisioning
+- Authentication integration (Logto)
+- ABAC authorization (Casbin)
+- Provider configuration management (BYO keys per tenant)
+- Quota and usage tracking (mirror Kong counters)
+- Feature flag integration (Flagsmith)
+- Audit trail with cryptographic signatures
+- Future-ready seams for prompt encryption (R2)
+
+### API Endpoints (v1)
+Tenants:
+- POST /v1/tenants (provision tenant + database)
+- GET /v1/tenants/{tenantId}
+- GET /v1/tenants (list with pagination)
+- PATCH /v1/tenants/{tenantId}
+
+Provider Configs (BYO):
+- GET /v1/tenants/{tenantId}/providers
+- PUT /v1/tenants/{tenantId}/providers (store encrypted keys)
+
+Quotas & Usage:
+- GET /v1/tenants/{tenantId}/quotas
+- PUT /v1/tenants/{tenantId}/quotas
+- GET /v1/tenants/{tenantId}/usage?from=&to=
+
+Feature Flags (Flagsmith proxy):
+- GET /v1/tenants/{tenantId}/flags
+- PUT /v1/tenants/{tenantId}/flags
+
+### Deliverables
+- FastAPI application with hexagonal architecture (Port 8082)
+- Tenant domain: provisioning, database-per-tenant creation
+- Provider domain: encrypted credential storage with future secretRef support
+- Quota domain: enforcement logic with reconciliation jobs
+- Usage domain: aggregation from Kong events
+- Logto integration: OIDC flow, role mapping
+- Casbin ABAC engine: policies for org/group/user
+- Flagsmith client integration
+- NATS consumer for quota.updated events from Kong
+- Audit logging with hash chain signatures
+- Database migration tooling (Alembic)
+- Health and readiness endpoints
+- OpenAPI spec generation
+- Documentation: API reference, tenant onboarding guide, ABAC policy examples
+
+### Integration Points
+- Auth: Logto (OIDC)
+- Feature Flags: Flagsmith API
+- Events: NATS (quota.updated consumer)
+- Upstream: Kong Gateway (quota sync)
+- DB: PostgreSQL (platform + per-tenant databases)
+- Cache: Redis (session, rate limits)
+
+## Service 4: Agent Orchestration Service (FastAPI + Temporal)
+
+### Responsibilities
+- Durable workflow execution for AI agents
+- LangGraph agent graph orchestration (plan/execute/review cycles)
+- Tool routing and MCP integration
+- Event-driven architecture with NATS
+- Automatic retry and recovery
+- Integration with Kong for LLM calls
+
+### API Endpoints (v1)
+- POST /v1/agents/execute { graphId, input, tools, options }
+- GET /v1/agents/executions/{executionId}
+- GET /v1/agents/executions?status=&cursor=
+
+### Events (NATS)
+- agent.requested
+- agent.started
+- agent.completed
+- agent.failed
+Payload: { executionId, tenantId, graphId, metrics, duration }
+
+### Deliverables
+- FastAPI application with hexagonal architecture (Port 8083)
+- Temporal worker integration with durable workflows
+- LangGraph orchestration for agent graphs
+- MCP (Model Context Protocol) client implementation
+- Tool registry and routing logic
+- NATS producer for agent lifecycle events
+- Agent execution state persistence
+- Workflow templates: plan-execute-review, multi-step reasoning
+- Integration with Kong Gateway for LLM tool calls
+- Retry policies and error handling
+- Health endpoints
+- Documentation: Agent workflow guide, tool development guide, MCP integration
+
+### Integration Points
+- Orchestration: Temporal server
+- Events: NATS JetStream (producer)
+- Gateway: Kong AI Gateway (LLM calls)
+- DB: PostgreSQL (execution state)
+- Cache: Redis (short-term state)
+
+## Service 5: Knowledge & RAG Service (FastAPI)
+
+### Responsibilities
+- Document ingestion and parsing (Unstructured.io)
+- Code indexing (language-aware chunking)
+- Vector embedding generation
+- Semantic search with hybrid retrieval (BM25 + dense)
+- RAG pipeline orchestration (LlamaIndex)
+- Multi-modal support (text, code, images)
+- Corpus management per tenant
+
+### API Endpoints (v1)
+Documents:
+- POST /v1/documents (metadata + content/URI)
+- GET /v1/documents?cursor=&limit=
+- DELETE /v1/documents/{documentId}
+
+Indexing:
+- POST /v1/indexes { corpusId, settings }
+- GET /v1/indexes/{indexId}
+- DELETE /v1/indexes/{indexId}
+
+Search:
+- POST /v1/search { query, filters, topK, hybrid=true }
+
+### Deliverables
+- FastAPI application with hexagonal architecture (Port 8084)
+- Document ingestion pipeline with Unstructured.io
+- PostgreSQL + pgvector for embeddings (MVP)
+- LlamaIndex orchestration for RAG pipeline
+- Hybrid retrieval: BM25 (lexical) + dense (semantic)
+- Code-aware chunking strategies
+- Embedding generation via Kong Gateway
+- Corpus isolation per tenant
+- Reranking pipeline for search results
+- Grounding and citation extraction
+- Batch ingestion jobs
+- MinIO integration for document storage
+- Future migration path to Milvus (documented)
+- Health endpoints
+- Documentation: RAG pipeline guide, corpus management, chunking strategies
+
+### Integration Points
+- Gateway: Kong AI Gateway (embedding generation)
+- Storage: MinIO (documents), PostgreSQL+pgvector (embeddings)
+- Orchestration: LlamaIndex
+- Parsing: Unstructured.io
+
+## Service 6: Integrations Service (FastAPI)
+
+### Responsibilities
+- Plugin architecture scaffold
+- Plugin lifecycle management (install, enable, configure, disable)
+- Per-tenant plugin enablement via Flagsmith
+- Webhook handlers for external systems
+- MCP tool exposition
+- Async background workers (Celery)
+- Future connectors: Jira, Slack, Teams, SharePoint, Confluence, Linear, Bitbucket
+
+### API Endpoints (v1)
+Plugin Catalog:
+- GET /v1/plugins
+
+Tenant Plugins:
+- POST /v1/tenants/{tenantId}/plugins/{plugin}/install
+- PUT /v1/tenants/{tenantId}/plugins/{plugin}/configure
+- POST /v1/tenants/{tenantId}/plugins/{plugin}/enable
+- POST /v1/tenants/{tenantId}/plugins/{plugin}/disable
+- DELETE /v1/tenants/{tenantId}/plugins/{plugin}/uninstall
+
+Webhooks:
+- POST /v1/webhooks/{plugin} (per plugin contract)
+
+### Deliverables
+- FastAPI application with hexagonal architecture (Port 8085)
+- Plugin interface contract (capabilities manifest, config schema, lifecycle hooks)
+- Plugin registry with versioning and compatibility matrix
+- Per-tenant plugin configuration storage
+- Flagsmith integration for plugin toggles
+- Celery worker setup with Redis broker
+- NATS event distribution for plugin events
+- Webhook authentication and validation
+- MCP server scaffold for tool exposition
+- Example plugin implementation (documented, disabled by default)
+- Plugin development guide
+- Secret management per tenant (with R2 Vault/KMS seam)
+- Health endpoints
+- Documentation: Plugin architecture guide, development SDK, webhook contracts
+
+### Integration Points
+- Feature Flags: Flagsmith (plugin enablement)
+- Events: NATS (plugin events)
+- Workers: Celery + Redis
+- DB: PostgreSQL (plugin configs per tenant)
+- Future: Vault/KMS for secrets (R2)
+
+## Service 7: Client Applications
+
+### 7.1 Open WebUI - Doc Chat Instance (Port 3000)
+
+#### Deliverables
+- Open WebUI deployment for document-focused chat
+- Pipeline configuration for RAG integration
+- Platform API integration for authentication
+- Tenant-specific branding configuration
+- Document upload and management UI
+- Chat history persistence
+- Citation display for grounded answers
+- Documentation: User guide for Doc Chat
+
+#### Integration Points
+- Auth: Platform API (via Logto)
+- Backend: Knowledge & RAG Service
+- Gateway: Kong AI Gateway
+
+### 7.2 Open WebUI - Code Chat Instance (Port 3001)
+
+#### Deliverables
+- Open WebUI deployment for code-focused chat
+- Code syntax highlighting and formatting
+- Platform API integration for authentication
+- Tenant-specific branding configuration
+- Code snippet management
+- Chat history persistence
+- MCP tool integration for code actions
+- Documentation: User guide for Code Chat
+
+#### Integration Points
+- Auth: Platform API (via Logto)
+- Backend: Agent Orchestration Service
+- Gateway: Kong AI Gateway
+
+### 7.3 Admin Dashboard (Next.js) (Port 3002)
+
+#### Features
+- Tenant management (CRUD)
+- Provider configuration interface
+- Quota management and alerts
+- Usage monitoring with charts
+- Cost tracking and burn-down
+- Feature flag management
+- Plugin enablement interface
+- User and role management
+
+#### Deliverables
+- Next.js application with TanStack Table
+- Platform API client integration
+- Real-time KPI dashboard:
+  - Cost ceilings and burn-down
+  - Success/error rates
+  - Latency P95
+  - Cache hit rates
+  - Active users
+- Provider configuration forms with encrypted key storage
+- Quota editor with soft alert thresholds
+- Usage analytics with date range filters
+- Flagsmith integration for feature toggles
+- Responsive design (desktop + tablet)
+- Documentation: Admin user guide
+
+#### Integration Points
+- Backend: Platform API (all endpoints)
+- Real-time: WebSocket or SSE for live updates
+- Auth: Logto (admin roles)
+
+### 7.4 Deloitte Dashboard (Next.js) (Port 3003)
+
+#### Features
+- Cross-tenant monitoring (Deloitte superadmin view)
+- Platform-wide KPIs
+- Tenant health and compliance status
+- Cost aggregation and forecasting
+- Audit log viewer
+- Incident and alert management
+
+#### Deliverables
+- Next.js application with advanced visualizations
+- Multi-tenant aggregated views
+- Platform-wide KPIs:
+  - Total cost and forecasts
+  - Tenant count and health
+  - Guardrail alerts summary
+  - System-wide success rates
+- Audit log search and filtering
+- Compliance dashboard (SOC2 readiness indicators)
+- Alert management interface
+- Export functionality (CSV, PDF)
+- Documentation: Deloitte dashboard guide
+
+#### Integration Points
+- Backend: Platform API (superadmin endpoints)
+- Observability: Grafana/Prometheus APIs
+- Logs: Loki query API
+
+## Infrastructure Components
+
+### 8.1 PostgreSQL Cluster (Port 5432)
+
+#### Deliverables
+- PostgreSQL 15+ deployment
+- Platform database for global configuration
+- Per-tenant database provisioning automation
+- pgvector extension for embeddings
+- Automated backups with encryption
+- Backup schedule: daily; retention 30 days
+- Point-in-time recovery (PITR) setup
+- Connection pooling (PgBouncer)
+- Monitoring and slow query logging
+- Documentation: Database administration guide, backup/restore procedures
+
+#### Specifications
+- RPO: 24 hours
+- RTO: 4 hours
+- Encryption at rest
+- SSL/TLS connections
+
+### 8.2 Redis Cluster (Port 6379)
+
+#### Deliverables
+- Redis 7+ deployment
+- Semantic cache for Kong (TTL policies)
+- Session storage for Platform API
+- Rate limiting counters
+- Celery task queue broker
+- Persistence configuration (AOF + RDB)
+- Eviction policies for cache
+- Monitoring and stats export
+- Documentation: Redis configuration guide
+
+### 8.3 MinIO (S3-Compatible Storage) (Ports 9000/9001)
+
+#### Deliverables
+- MinIO deployment with HA configuration
+- Bucket setup:
+  - documents (per-tenant namespacing)
+  - mlflow-artifacts
+  - backups
+- Access policies and IAM
+- Encryption at rest
+- Versioning enabled for critical buckets
+- Lifecycle policies for old objects
+- Monitoring and audit logging
+- Documentation: Object storage guide
+
+### 8.4 Logto (SSO/Identity) (Port 3004)
+
+#### Deliverables
+- Logto deployment
+- OIDC provider configuration
+- Application registrations for all client apps
+- Role definitions: superadmin, admin, user
+- Attribute-based access control (ABAC) claims
+- MFA support configuration
+- Session management policies
+- Webhook integration for user lifecycle events
+- Documentation: Logto configuration guide, user onboarding
+
+### 8.5 Flagsmith (Feature Flags) (Port 8000)
+
+#### Deliverables
+- Flagsmith deployment
+- Platform-level flags definition
+- Tenant segment configuration
+- Plugin enablement flags
+- Experimental feature toggles
+- SDK integration guides for services
+- Webhook for flag change notifications
+- Documentation: Feature flag strategy guide
+
+### 8.6 Temporal (Workflow Engine) (Port 7233)
+
+#### Deliverables
+- Temporal server deployment
+- Worker registration for Agent Orchestration
+- Workflow definitions for agent graphs
+- Monitoring and visibility UI
+- Automatic retry policies
+- Long-running workflow support
+- Documentation: Temporal workflow guide
+
+### 8.7 NATS JetStream (Event Bus) (Port 4222)
+
+#### Deliverables
+- NATS JetStream deployment
+- Subject schema definition (domain.action)
+- Event envelope standard implementation
+- Stream and consumer configuration
+- Retention and deduplication policies
+- Monitoring and message tracing
+- Documentation: Event architecture guide, subject catalog
+
+#### Standard Subjects
+- quota.updated
+- agent.requested, agent.started, agent.completed, agent.failed
+- tenant.created, tenant.updated
+- plugin.installed, plugin.enabled, plugin.disabled
+- conversation.started, conversation.ended (R2 archival hook)
+
+### 8.8 Observability Stack (Port 8086)
+
+#### Components
+- Grafana Loki (log aggregation)
+- Prometheus (metrics collection)
+- Grafana (visualization)
+- OpenTelemetry Collector (traces)
+- Langfuse (LLM-specific observability)
+
+#### Deliverables
+- Loki deployment with log retention policies
+- Prometheus deployment with scrape configs for all services
+- Grafana deployment with dashboards:
+  - Platform overview (KPIs)
+  - Per-service health
+  - LLM usage and costs
+  - Cache hit rates
+  - Latency distributions
+- OpenTelemetry Collector with trace exporters
+- Langfuse deployment for LLM trace analysis
+- Alert rules for critical metrics:
+  - Service downtime
+  - Quota threshold breaches
+  - Error rate spikes
+  - Latency SLA violations
+- Log redaction policies for PII
+- Tenant-level metric isolation
+- Documentation: Observability guide, dashboard catalog, alert runbook
+
+## Cross-Cutting Concerns
+
+### 9.1 Docker Compose Configuration
+
+#### Deliverables
+- docker-compose.yml for all services
+- docker-compose.dev.yml for development overrides
+- Network isolation setup
+- Volume management for persistence
+- Environment variable templating
+- Health check definitions
+- Resource limits and reservations
+- Startup dependency ordering
+- Documentation: Docker deployment guide
+
+### 9.2 Database Migrations (All Services)
+
+#### Deliverables
+- Alembic configuration for each FastAPI service
+- Initial schema migrations:
+  - Platform API: tenants, users, providers, quotas, audit_logs
+  - Agent Orchestration: executions, workflows
+  - Knowledge & RAG: documents, indexes, embeddings
+  - Integrations: plugins, plugin_configs
+- Migration execution scripts
+- Rollback procedures
+- Documentation: Migration guide
+
+### 9.3 Security Hardening
+
+#### Deliverables
+- TLS termination at Kong Gateway
+- Certificate management strategy
+- Secret management with Docker secrets
+- Environment variable encryption
+- Network segmentation policies
+- Service-to-service authentication design (future mTLS)
+- Vulnerability scanning integration
+- Security headers configuration
+- CORS policies
+- Documentation: Security hardening checklist
+
+### 9.4 Testing Strategy
+
+#### Deliverables
+- Unit tests for domain logic (80% coverage target)
+- Integration tests for API contracts
+- E2E tests for critical user flows
+- Load testing scripts (Locust or k6):
+  - LLM routing through Kong
+  - RAG search performance
+  - Multi-tenant isolation
+- Chaos testing scenarios (optional, documented)
+- Test data generators
+- CI/CD pipeline integration
+- Documentation: Testing guide
+
+### 9.5 CI/CD Pipeline
+
+#### Deliverables
+- GitHub Actions workflows (or equivalent):
+  - Lint and format check
+  - Unit and integration tests
+  - Docker image builds
+  - Security scans
+  - Deployment to staging
+- Automated database migrations
+- Rollback procedures
+- Blue-green deployment strategy (documented)
+- Documentation: CI/CD guide
+
+### 9.6 Documentation Suite
+
+#### Deliverables
+- Architecture Decision Records (ADRs) for key choices
+- API documentation (OpenAPI/Swagger)
+- User guides for each client application
+- Admin operations manual
+- Developer onboarding guide
+- Troubleshooting runbook
+- Disaster recovery procedures
+- Tenant onboarding playbook
+- Plugin development SDK
+- Release notes template
+
+## Forward Compatibility (R2/R3 Seams)
+
+### 10.1 Prompt IP Encryption (R2)
+
+#### Design Seams (No Implementation)
+- secretRef field in provider configs (Platform API)
+- Key management interface abstraction
+- In-memory decryption hooks in Agent Orchestration
+- Audit event stubs for key operations
+- Documentation: R2 encryption migration plan
+
+### 10.2 Conversation Archival (R2)
+
+#### Design Seams (No Implementation)
+- conversation.archived event stub in NATS
+- Archival storage interface (Agent Orchestration)
+- Retention policy configuration fields
+- Export API contract (documented, not implemented)
+- Documentation: R2 archival design
+
+### 10.3 Guardrail Enforcement (R3)
+
+#### Design Seams (No Implementation)
+- Policy engine interface with detect/block modes
+- Override mechanism for authorized users
+- Exemption management API (documented)
+- Documentation: R3 guardrail enforcement design
+
+### 10.4 Data Residency (R3)
+
+#### Design Seams (No Implementation)
+- region attribute on tenant model
+- Egress policy hook in Kong configuration
+- Residency-aware scheduling hints
+- Documentation: R3 residency compliance design
+
+### 10.5 Semantic Cache Isolation (R3)
+
+#### Design Seams (No Implementation)
+- Cache key namespace: tenant+provider+model
+- TTL configuration per tenant
+- Invalidation policy hooks
+- Documentation: R3 cache isolation design
+
+## Acceptance Criteria (R1)
+
+### AC1: Multi-Tenant Authentication
+- [ ] User can sign in via Logto OIDC
+- [ ] New tenant creation provisions dedicated database
+- [ ] Tenant isolation verified (no cross-tenant data access)
+
+### AC2: BYO LLM Provider
+- [ ] Tenant can configure OpenAI, Anthropic, Google/Vertex, Groq credentials
+- [ ] LLM calls routed through Kong to configured provider
+- [ ] Egress allowlist enforced (only allowed endpoints)
+
+### AC3: Quota Enforcement
+- [ ] Rate limits enforced at Kong per tenant
+- [ ] Quota counters mirrored in Platform API
+- [ ] Soft alerts triggered when quota threshold reached
+
+### AC4: Semantic Caching
+- [ ] Redis cache populated on first LLM request
+- [ ] Cache hit returns cached response (verified via metrics)
+- [ ] 40%+ cache hit rate achieved in load testing
+
+### AC5: RAG Functionality
+- [ ] Sample corpus ingested and indexed
+- [ ] Search query returns relevant documents
+- [ ] Grounded answers with citations generated
+- [ ] Hybrid retrieval (BM25 + dense) functional
+
+### AC6: Agent Workflows
+- [ ] Agent execution initiated via API
+- [ ] Temporal workflow persists state across steps
+- [ ] Tool calls routed through Agent Orchestration
+- [ ] Workflow completion emits success event
+
+### AC7: Dashboards
+- [ ] Admin Dashboard displays KPIs: cost, latency P95, cache hit rate, errors
+- [ ] Deloitte Dashboard shows multi-tenant aggregates
+- [ ] Real-time updates functional
+
+### AC8: Feature Flags
+- [ ] Platform-level flag controls global feature
+- [ ] Tenant-level flag overrides platform default
+- [ ] Plugin enablement via Flagsmith verified
+
+### AC9: Observability
+- [ ] All services emit OpenTelemetry traces
+- [ ] Logs aggregated in Loki (PII redacted)
+- [ ] Prometheus metrics scraped
+- [ ] Grafana dashboards display system health
+- [ ] Langfuse captures LLM traces
+
+### AC10: Guardrails (Alert-Only)
+- [ ] Prompt injection attempt detected and logged
+- [ ] DLP pattern detected and logged
+- [ ] Alerts visible in admin dashboard
+- [ ] No requests blocked (alert-only mode verified)
+
+## Release Criteria
+
+### Documentation
+- [ ] All R1 PRDs and addenda published
+- [ ] API contracts documented in SERVICE_CONTRACTS.md
+- [ ] Configuration model documented in CONFIGURATION.md
+- [ ] Plugin architecture guide published
+- [ ] Operations runbook completed
+- [ ] User guides for all client apps
+
+### Testing
+- [ ] All acceptance criteria passed
+- [ ] Load testing completed (target: 100 concurrent users, 1000 req/min)
+- [ ] Security scan completed with no critical vulnerabilities
+- [ ] Multi-tenant isolation verified
+- [ ] Disaster recovery tested (RPO/RTO met)
+
+### Deployment
+- [ ] All services deployable via docker-compose
+- [ ] Health checks passing for all services
+- [ ] Automated backups configured and tested
+- [ ] Monitoring alerts configured
+- [ ] Demo environment operational with sample data
+
+## Out of Scope (Explicit)
+
+- Local/on-prem LLM inference (vLLM, Ollama)
+- Automatic LLM provider failover
+- Prompt IP encryption implementation (R2)
+- Conversation legal hold/archival (R2)
+- Guardrail blocking mode (R3)
+- Data residency enforcement (R3)
+- Tenant offboarding runbook (R3)
+- Semantic cache invalidation policies (R3)
+- Marketplace UI for plugin discovery (R4)
+
+## Notes for Taskmaster Parsing
+
+- Each major section (Service 1-7, Infrastructure 8.1-8.8, Cross-Cutting 9.1-9.6) should become a top-level task
+- Deliverables within each section are subtask candidates
+- Integration points inform dependency relationships
+- Acceptance Criteria map to verification tasks
+- Hexagonal architecture already scaffolded (focus on domain logic, adapters, ports)
+- Follow SERVICE_CONTRACTS.md for API consistency
+- Adhere to configuration model in CONFIGURATION.md
+- Plugin contracts in PLUGIN_ARCHITECTURE.md
+- Security constraints in GUARDRAILS_AND_DLP.md
+- Forward compatibility seams are design-only (no code in R1)
+
+
