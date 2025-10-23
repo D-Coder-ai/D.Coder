@@ -9,18 +9,28 @@ if (-not (Test-Path $StatePath)) {
 
 if (Get-Command conftest -ErrorAction SilentlyContinue) {
   Write-Host "Running conftest policy checks..."
-  # Provide allowlist data file explicitly to input so policy can read it
-  conftest test $StatePath -p "infra/policies" --combine --input "infra/policies/allowed_provider_hosts.yaml"
+  # Test the combined file that includes both services and allowed_hosts
+  conftest test "infra/kong/kong-with-allowlist.yaml" -p "infra/policies"
+  if ($LASTEXITCODE -ne 0) {
+    Write-Error "Conftest policy validation failed!"
+    exit 1
+  }
 } else {
   Write-Host "conftest not found. Skipping policy checks."
 }
 
 if (Get-Command deck -ErrorAction SilentlyContinue) {
   Write-Host "Running decK gateway diff (skips if Admin API not reachable)..."
-  try {
-    deck gateway diff "$StatePath" --non-zero-exit-code
-  } catch {
-    Write-Warning "decK could not reach Admin API (likely Kong not running). Skipping diff."
+  $deckOutput = deck gateway diff "$StatePath" 2>&1
+  if ($LASTEXITCODE -ne 0) {
+    if ($deckOutput -match "connectex|connection refused|No connection") {
+      Write-Warning "Kong Admin API not reachable. Skipping diff (Kong likely not running)."
+    } else {
+      Write-Error "decK diff failed: $deckOutput"
+      exit 1
+    }
+  } else {
+    Write-Host "decK diff successful (no changes detected)."
   }
 } else {
   Write-Host "decK not found. Skipping decK diff."
