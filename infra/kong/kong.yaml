@@ -4,14 +4,191 @@ services:
   - name: openai
     url: https://api.openai.com/v1
     tags: [r1, provider, allowlisted]
+    routes:
+      # OpenAI GPT-5 Models (Responses API)
+      - name: llm.openai.gpt-5
+        paths: [/v1/llm/openai/gpt-5]
+        strip_path: false
+        preserve_host: false
+        tags: [r1, llm-route, openai]
+        plugins:
+          - name: request-transformer
+            config:
+              replace:
+                uri: /v1/responses
+              add:
+                headers:
+                  - "Authorization: Bearer $(OPENAI_API_KEY)"
+      
+      - name: llm.openai.gpt-5-chat
+        paths: [/v1/llm/openai/gpt-5-chat]
+        strip_path: false
+        preserve_host: false
+        tags: [r1, llm-route, openai]
+        plugins:
+          - name: request-transformer
+            config:
+              replace:
+                uri: /v1/responses
+              add:
+                headers:
+                  - "Authorization: Bearer $(OPENAI_API_KEY)"
+      
+      - name: llm.openai.gpt-4-1
+        paths: [/v1/llm/openai/gpt-4-1]
+        strip_path: false
+        preserve_host: false
+        tags: [r1, llm-route, openai]
+        plugins:
+          - name: request-transformer
+            config:
+              replace:
+                uri: /v1/responses
+              add:
+                headers:
+                  - "Authorization: Bearer $(OPENAI_API_KEY)"
+      
+      - name: llm.openai.gpt-5-codex
+        paths: [/v1/llm/openai/gpt-5-codex]
+        strip_path: false
+        preserve_host: false
+        tags: [r1, llm-route, openai]
+        plugins:
+          - name: request-transformer
+            config:
+              replace:
+                uri: /v1/responses
+              add:
+                headers:
+                  - "Authorization: Bearer $(OPENAI_API_KEY)"
+
   - name: anthropic
     url: https://api.anthropic.com/v1
     tags: [r1, provider, allowlisted]
+    routes:
+      # Anthropic Claude Models (Messages API)
+      - name: llm.anthropic.claude-sonnet-4-5
+        paths: [/v1/llm/anthropic/claude-sonnet-4-5]
+        strip_path: false
+        preserve_host: false
+        tags: [r1, llm-route, anthropic]
+        plugins:
+          - name: request-transformer
+            config:
+              replace:
+                uri: /v1/messages
+              add:
+                headers:
+                  - "x-api-key: $(ANTHROPIC_API_KEY)"
+                  - "anthropic-version: 2023-06-01"
+      
+      - name: llm.anthropic.claude-opus-4-1
+        paths: [/v1/llm/anthropic/claude-opus-4-1]
+        strip_path: false
+        preserve_host: false
+        tags: [r1, llm-route, anthropic]
+        plugins:
+          - name: request-transformer
+            config:
+              replace:
+                uri: /v1/messages
+              add:
+                headers:
+                  - "x-api-key: $(ANTHROPIC_API_KEY)"
+                  - "anthropic-version: 2023-06-01"
+
   - name: google-generative
     url: https://generativelanguage.googleapis.com/v1beta
     tags: [r1, provider, allowlisted]
+    routes:
+      # Google Gemini Models (Generate Content API)
+      - name: llm.google.gemini-2-5-pro
+        paths: [/v1/llm/google/gemini-2-5-pro]
+        strip_path: false
+        preserve_host: false
+        tags: [r1, llm-route, google]
+        plugins:
+          - name: request-transformer
+            config:
+              replace:
+                uri: /v1beta/models/gemini-2.5-pro:generateContent
+              add:
+                headers:
+                  - "x-goog-api-key: $(GOOGLE_API_KEY)"
+      
+      - name: llm.google.gemini-2-5-flash
+        paths: [/v1/llm/google/gemini-2-5-flash]
+        strip_path: false
+        preserve_host: false
+        tags: [r1, llm-route, google]
+        plugins:
+          - name: request-transformer
+            config:
+              replace:
+                uri: /v1beta/models/gemini-2.5-flash:generateContent
+              add:
+                headers:
+                  - "x-goog-api-key: $(GOOGLE_API_KEY)"
+      
+      - name: llm.google.gemini-2-5-flash-lite
+        paths: [/v1/llm/google/gemini-2-5-flash-lite]
+        strip_path: false
+        preserve_host: false
+        tags: [r1, llm-route, google]
+        plugins:
+          - name: request-transformer
+            config:
+              replace:
+                uri: /v1beta/models/gemini-2.5-flash-lite:generateContent
+              add:
+                headers:
+                  - "x-goog-api-key: $(GOOGLE_API_KEY)"
+
   - name: groq
     url: https://api.groq.com/openai/v1
     tags: [r1, provider, allowlisted]
+    routes:
+      # Groq Models (OpenAI-compatible API)
+      - name: llm.groq.gpt-oss-120b
+        paths: [/v1/llm/groq/gpt-oss-120b]
+        strip_path: false
+        preserve_host: false
+        tags: [r1, llm-route, groq]
+        plugins:
+          - name: request-transformer
+            config:
+              replace:
+                uri: /openai/v1/chat/completions
+              add:
+                headers:
+                  - "Authorization: Bearer $(GROQ_API_KEY)"
+      
+      - name: llm.groq.gpt-oss-20b
+        paths: [/v1/llm/groq/gpt-oss-20b]
+        strip_path: false
+        preserve_host: false
+        tags: [r1, llm-route, groq]
+        plugins:
+          - name: request-transformer
+            config:
+              replace:
+                uri: /openai/v1/chat/completions
+              add:
+                headers:
+                  - "Authorization: Bearer $(GROQ_API_KEY)"
+      
+      - name: llm.groq.kimi-k2-instruct
+        paths: [/v1/llm/groq/kimi-k2-instruct]
+        strip_path: false
+        preserve_host: false
+        tags: [r1, llm-route, groq]
+        plugins:
+          - name: request-transformer
+            config:
+              replace:
+                uri: /openai/v1/chat/completions
+              add:
+                headers:
+                  - "Authorization: Bearer $(GROQ_API_KEY)"
 
 
