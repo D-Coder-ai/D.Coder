@@ -1,0 +1,17 @@
+_format_version: "3.0"
+
+services:
+  - name: openai
+    url: https://api.openai.com/v1
+    tags: [r1, provider, allowlisted]
+  - name: anthropic
+    url: https://api.anthropic.com/v1
+    tags: [r1, provider, allowlisted]
+  - name: google-generative
+    url: https://generativelanguage.googleapis.com/v1beta
+    tags: [r1, provider, allowlisted]
+  - name: groq
+    url: https://api.groq.com/openai/v1
+    tags: [r1, provider, allowlisted]
+
+

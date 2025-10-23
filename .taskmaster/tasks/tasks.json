@@ -17,7 +17,7 @@
             "description": "Provision base infrastructure required for Kong AI Gateway with Postgres 15+, Redis 7+, NATS, and Prometheus.",
             "dependencies": [],
             "details": "Deliverables:\n- Docker Compose or Helm charts for Postgres, Redis, NATS, Prometheus\n- Network and credentials for components; volumes for Postgres and Redis persistence\n- Makefile tasks: make up, make down, make logs\nConfig snippet (compose excerpt, minimal):\n- services:\n  - postgres: image: postgres:15, env: POSTGRES_PASSWORD, volume: pgdata\n  - redis: image: redis:7, command: redis-server --appendonly yes\n  - nats: image: nats:2, command: -js -sd /data, ports: 4222, 8222\n  - prometheus: image: prom/prometheus, config: scrape Kong /metrics\nTest cases:\n- Postgres accepts connections and initializes database kong\n- Redis responds to PING and persists data\n- NATS pub sub roundtrip using nats req and nats reply\n- Prometheus target up and scraping\nRollback plan:\n- Compose down while preserving persistent volumes; revert Helm release to previous revision\n- Keep DB snapshot before migration; restore if needed",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Container health checks, port checks, and functional PING/pub-sub verification with scripted smoke tests."
           },
           {
@@ -27,8 +27,8 @@
             "dependencies": [
               1
             ],
-            "details": "Deliverables:\n- kong.yaml entries for strictly allowlisted provider services\n- Admin API hardening to prevent dynamic upstream creation in prod\nConfig snippet (kong.yaml excerpt):\n- services:\n  - name: openai  url: https://api.openai.com/v1\n  - name: anthropic  url: https://api.anthropic.com/v1\n  - name: google  url: https://generativelanguage.googleapis.com/v1beta\n  - name: groq  url: https://api.groq.com/openai/v1\n- disable creation of other services via CI policy and deck allowlist\nTest cases:\n- Requests to non-allowlisted hosts do not route (404)\n- deck diff shows only allowlisted services; attempts to add others are rejected by policy\nRollback plan:\n- Revert kong.yaml to previous git tag and deck sync\n- Temporarily allow only previously deployed upstreams until investigation completes",
-            "status": "pending",
+            "details": "Deliverables:\n- kong.yaml entries for strictly allowlisted provider services\n- Admin API hardening to prevent dynamic upstream creation in prod\nConfig snippet (kong.yaml excerpt):\n- services:\n  - name: openai  url: https://api.openai.com/v1\n  - name: anthropic  url: https://api.anthropic.com/v1\n  - name: google  url: https://generativelanguage.googleapis.com/v1beta\n  - name: groq  url: https://api.groq.com/openai/v1\n- disable creation of other services via CI policy and deck allowlist\nTest cases:\n- Requests to non-allowlisted hosts do not route (404)\n- deck diff shows only allowlisted services; attempts to add others are rejected by policy\nRollback plan:\n- Revert kong.yaml to previous git tag and deck sync\n- Temporarily allow only previously deployed upstreams until investigation completes\n<info added on 2025-10-23T21:38:38.266Z>\nImplementation progress (Docker Compose, R1 target)\n\nDone:\n- Added declarative services in infra/kong/kong.yaml for OpenAI, Anthropic, Google Generative Language API, and Groq (no routes/plugins yet).\n- Added OPA/Conftest allowlist policy under infra/policies (kong_services.rego and allowed_provider_hosts.yaml) to restrict upstreams to the approved set.\n- Documented Admin API hardening for Compose in infra/kong/README.md (RBAC enabled, Admin listen bound to localhost, status listen read-only).\n- Lint checks passing for all new files.\n\nNext:\n- Add/run conftest validation in local and CI workflows (validate-config) once conftest is available in the environment.\n\nNotes:\n- Aligned with R1 constraints: BYO LLM, public egress allowlist, no failover; guardrails are alert-only and deferred to later subtasks.\n</info added on 2025-10-23T21:38:38.266Z>",
+            "status": "done",
             "testStrategy": "Declarative config validation via kong check and deck diff; negative tests against unapproved endpoints."
           },
           {
@@ -2895,7 +2895,7 @@
     ],
     "metadata": {
       "created": "2025-10-23T17:02:30.104Z",
-      "updated": "2025-10-23T17:02:30.104Z",
+      "updated": "2025-10-23T21:38:42.248Z",
       "description": "Tasks for r1-beta context"
     }
   }
