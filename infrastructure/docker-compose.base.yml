@@ -1,0 +1,308 @@
+version: '3.8'
+
+networks:
+  dcoder-network:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  redis-data:
+  minio-data:
+  kong-data:
+  prometheus-data:
+  grafana-data:
+  loki-data:
+  nats-data:
+
+services:
+  # ==================== Data Stores ====================
+  postgres:
+    image: postgres:15-alpine
+    container_name: dcoder-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-dcoder}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      POSTGRES_DB: ${POSTGRES_DB:-dcoder_platform}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./infra/volumes/postgres/init:/docker-entrypoint-initdb.d
+    networks:
+      - dcoder-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-dcoder}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: dcoder-redis
+    command: redis-server /etc/redis/redis.conf
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+      - ./infra/redis/redis.conf:/etc/redis/redis.conf:ro
+    networks:
+      - dcoder-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    container_name: dcoder-minio
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+    networks:
+      - dcoder-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  # ==================== Message Queue ====================
+  nats:
+    image: nats:2.10-alpine
+    container_name: dcoder-nats
+    command: -c /etc/nats/nats.conf -js
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    volumes:
+      - ./infra/nats/nats.conf:/etc/nats/nats.conf:ro
+      - nats-data:/data
+    networks:
+      - dcoder-network
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8222/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ==================== Temporal (Agent Orchestration) ====================
+  temporal:
+    image: temporalio/auto-setup:latest
+    container_name: dcoder-temporal
+    depends_on:
+      - postgres
+    environment:
+      DB: postgresql
+      DB_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER:-dcoder}
+      POSTGRES_PWD: ${POSTGRES_PASSWORD:-changeme}
+      POSTGRES_SEEDS: postgres
+    ports:
+      - "7233:7233"
+    networks:
+      - dcoder-network
+
+  temporal-ui:
+    image: temporalio/ui:latest
+    container_name: dcoder-temporal-ui
+    depends_on:
+      - temporal
+    environment:
+      TEMPORAL_ADDRESS: temporal:7233
+    ports:
+      - "8088:8080"
+    networks:
+      - dcoder-network
+
+  # ==================== Kong Gateway ====================
+  kong-migrations:
+    image: kong:latest
+    container_name: dcoder-kong-migrations
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      KONG_DATABASE: postgres
+      KONG_PG_HOST: postgres
+      KONG_PG_USER: ${POSTGRES_USER:-dcoder}
+      KONG_PG_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+    command: kong migrations bootstrap
+    networks:
+      - dcoder-network
+    restart: on-failure
+
+  kong:
+    build:
+      context: ../services/kong-gateway
+      dockerfile: Dockerfile
+    container_name: dcoder-kong
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /etc/kong/custom/kong.yaml
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_ADMIN_ACCESS_LOG: /dev/stdout
+      KONG_PROXY_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_LISTEN: 0.0.0.0:8001
+      KONG_PROXY_LISTEN: 0.0.0.0:8000
+      KONG_STATUS_LISTEN: 0.0.0.0:8100
+      KONG_LOG_LEVEL: debug
+      # LLM Provider API Keys (BYO credentials for R1)
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+    ports:
+      - "8000:8000"  # Proxy port
+      - "8443:8443"  # Proxy SSL port
+      - "8001:8001"  # Admin API port
+      - "8444:8444"  # Admin API SSL port
+      - "8100:8100"  # Status port
+    volumes:
+      - kong-data:/var/lib/kong
+      - ../services/kong-gateway/config:/etc/kong/custom:ro
+    networks:
+      - dcoder-network
+    healthcheck:
+      test: ["CMD", "kong", "health"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+
+  # ==================== LiteLLM Proxy (LLM Gateway) ====================
+  litellm-proxy:
+    build:
+      context: ../services/litellm-proxy
+      dockerfile: Dockerfile
+    container_name: dcoder-litellm-proxy
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      # LLM Provider API Keys (same as Kong for now)
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      
+      # LiteLLM Master Key for admin operations
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-sk-1234567890abcdef}
+      
+      # Redis Configuration
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      
+      # Database for virtual keys
+      DATABASE_URL: postgresql://litellm:${LITELLM_DB_PASSWORD:-changeme}@postgres:5432/litellm
+      
+      # Observability
+      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
+      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
+      
+      # Logging
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    ports:
+      - "4000:4000"  # LiteLLM proxy port
+    volumes:
+      - ../services/litellm-proxy/config:/app/config:ro
+      - ../shared/python:/app/shared/python:ro
+    networks:
+      - dcoder-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ==================== Observability Stack ====================
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: dcoder-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - prometheus-data:/prometheus
+      - ./infra/observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.enable-lifecycle'
+    networks:
+      - dcoder-network
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: dcoder-grafana
+    ports:
+      - "3005:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_INSTALL_PLUGINS: grafana-clock-panel
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./infra/observability/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./infra/observability/grafana/datasources:/etc/grafana/provisioning/datasources
+    networks:
+      - dcoder-network
+
+  loki:
+    image: grafana/loki:latest
+    container_name: dcoder-loki
+    ports:
+      - "3100:3100"
+    volumes:
+      - loki-data:/loki
+      - ./infra/observability/loki/loki.yml:/etc/loki/loki.yml
+    command: -config.file=/etc/loki/loki.yml
+    networks:
+      - dcoder-network
+
+  # ==================== Authentication (Logto) ====================
+  logto:
+    image: svhd/logto:latest
+    container_name: dcoder-logto
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "3001:3001"
+      - "3002:3002"
+    environment:
+      DB_URL: postgres://${POSTGRES_USER:-dcoder}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/logto
+      ENDPOINT: http://localhost:3001
+      ADMIN_ENDPOINT: http://localhost:3002
+    networks:
+      - dcoder-network
+
+  # ==================== Feature Flags (Flagsmith) ====================
+  flagsmith:
+    image: flagsmith/flagsmith:latest
+    container_name: dcoder-flagsmith
+    depends_on:
+      - postgres
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-dcoder}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/flagsmith
+      DJANGO_SECRET_KEY: ${FLAGSMITH_SECRET_KEY:-changeme}
+      ENABLE_ADMIN_ACCESS: 'True'
+    ports:
+      - "8090:8000"
+    networks:
+      - dcoder-network
+
+  # ==================== Services (will be added as they're developed) ====================
+  # platform-api, llmops, agent-orchestrator, knowledge-rag, integrations, client-apps
+  # These will be added incrementally as we develop each service

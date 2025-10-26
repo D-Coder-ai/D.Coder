@@ -1,0 +1,160 @@
+# LiteLLM Proxy Configuration
+# R1 Hybrid Gateway Architecture
+
+model_list:
+  # ==================== OpenAI Models ====================
+  - model_name: gpt-4o
+    litellm_params:
+      model: openai/gpt-4o
+      api_key: os.environ/OPENAI_API_KEY
+      rpm: 10000  # requests per minute
+      tpm: 2000000  # tokens per minute
+
+  - model_name: gpt-4o-mini
+    litellm_params:
+      model: openai/gpt-4o-mini
+      api_key: os.environ/OPENAI_API_KEY
+      rpm: 30000
+      tpm: 5000000
+
+  - model_name: gpt-4-turbo
+    litellm_params:
+      model: openai/gpt-4-turbo
+      api_key: os.environ/OPENAI_API_KEY
+      rpm: 10000
+      tpm: 2000000
+
+  - model_name: gpt-3.5-turbo
+    litellm_params:
+      model: openai/gpt-3.5-turbo
+      api_key: os.environ/OPENAI_API_KEY
+      rpm: 30000
+      tpm: 5000000
+
+  # ==================== Anthropic Models ====================
+  - model_name: claude-sonnet-4-5
+    litellm_params:
+      model: anthropic/claude-sonnet-4-5-20250929
+      api_key: os.environ/ANTHROPIC_API_KEY
+      rpm: 5000
+      tpm: 1000000
+
+  - model_name: claude-opus-4-1
+    litellm_params:
+      model: anthropic/claude-opus-4-1-20250514
+      api_key: os.environ/ANTHROPIC_API_KEY
+      rpm: 4000
+      tpm: 800000
+
+  - model_name: claude-haiku-3-5
+    litellm_params:
+      model: anthropic/claude-3-5-haiku-20241022
+      api_key: os.environ/ANTHROPIC_API_KEY
+      rpm: 10000
+      tpm: 2000000
+
+  # ==================== Google Models ====================
+  - model_name: gemini-2-5-pro
+    litellm_params:
+      model: gemini/gemini-2.5-pro
+      api_key: os.environ/GOOGLE_API_KEY
+      rpm: 15000
+      tpm: 4000000
+
+  - model_name: gemini-2-5-flash
+    litellm_params:
+      model: gemini/gemini-2.5-flash
+      api_key: os.environ/GOOGLE_API_KEY
+      rpm: 30000
+      tpm: 8000000
+
+  - model_name: gemini-1-5-pro
+    litellm_params:
+      model: gemini/gemini-1.5-pro
+      api_key: os.environ/GOOGLE_API_KEY
+      rpm: 15000
+      tpm: 4000000
+
+  # ==================== Groq Models ====================
+  - model_name: groq-llama-3-3-70b
+    litellm_params:
+      model: groq/llama-3.3-70b-versatile
+      api_key: os.environ/GROQ_API_KEY
+      rpm: 30
+      tpm: 20000
+
+  - model_name: groq-mixtral-8x7b
+    litellm_params:
+      model: groq/mixtral-8x7b-32768
+      api_key: os.environ/GROQ_API_KEY
+      rpm: 30
+      tpm: 20000
+
+# Router Settings - Load Balancing and Failover
+router_settings:
+  routing_strategy: cost-based-routing  # Route to cheapest model when multiple options available
+  num_retries: 3  # Retry failed requests up to 3 times
+  timeout: 120  # Request timeout in seconds
+  
+  # Fallback configuration - if primary model fails, try these alternatives
+  fallbacks:
+    - gpt-4o: ["claude-sonnet-4-5", "gemini-2-5-pro"]
+    - claude-sonnet-4-5: ["gpt-4o", "gemini-2-5-pro"]
+    - gemini-2-5-pro: ["gpt-4o", "claude-sonnet-4-5"]
+  
+  # Redis for distributed rate limiting across multiple LiteLLM instances
+  redis_host: redis
+  redis_port: 6379
+
+# LiteLLM Settings - Caching, Compression, Observability
+litellm_settings:
+  # Enable caching
+  cache: true
+  cache_params:
+    type: redis
+    host: redis
+    port: 6379
+    ttl: 3600  # Cache responses for 1 hour (3600 seconds)
+    namespace: "litellm:cache"  # Redis key prefix for organization
+    supported_call_types: ["acompletion", "atext_completion", "aembedding"]
+    max_connections: 100  # Maximum Redis connections in the pool
+  
+  # Callbacks for observability and custom logic
+  success_callback: ["langfuse", "prometheus"]
+  failure_callback: ["langfuse"]
+  callbacks: ["prompt_compression_middleware"]  # Custom middleware for prompt compression
+  
+  # Logging
+  set_verbose: false
+  json_logs: true
+
+# General Settings
+general_settings:
+  # Master key for admin operations (virtual key management, etc.)
+  master_key: ${LITELLM_MASTER_KEY}
+  
+  # Database for virtual keys and usage tracking
+  database_url: ${DATABASE_URL}
+  
+  # Virtual key defaults
+  litellm_key_budget_duration: "30d"  # Budget resets every 30 days
+  
+  # Allowed routes (for security)
+  allowed_routes: [
+    "/chat/completions",
+    "/completions",
+    "/embeddings",
+    "/v1/chat/completions",
+    "/v1/completions",
+    "/v1/embeddings"
+  ]
+  
+  # Admin-only routes (require master key)
+  admin_only_routes: [
+    "/key/generate",
+    "/key/delete",
+    "/key/info",
+    "/config",
+    "/model/info"
+  ]
+

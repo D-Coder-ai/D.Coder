@@ -1,0 +1,44 @@
+{
+  "name": "agent-orchestrator",
+  "sourceRoot": "services/agent-orchestrator/src",
+  "projectType": "application",
+  "targets": {
+    "serve": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "docker-compose up agent-orchestrator",
+        "cwd": "{workspaceRoot}"
+      }
+    },
+    "build": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "poetry build",
+        "cwd": "services/agent-orchestrator"
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "poetry run pytest",
+        "cwd": "services/agent-orchestrator"
+      }
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "poetry run ruff check .",
+        "cwd": "services/agent-orchestrator"
+      }
+    },
+    "docker-build": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "docker build -t dcoder/agent-orchestrator:latest .",
+        "cwd": "services/agent-orchestrator"
+      }
+    }
+  },
+  "tags": ["type:service", "lang:python", "team:agents"]
+}
+

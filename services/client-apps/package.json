@@ -1,0 +1,10 @@
+{
+  "name": "dcoder-client-apps",
+  "version": "1.0.0",
+  "description": "D.Coder Client Applications",
+  "private": true,
+  "scripts": {
+    "dev": "echo 'Development mode'",
+    "build": "echo 'Building apps'"
+  }
+}

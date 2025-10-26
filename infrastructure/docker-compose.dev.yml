@@ -1,0 +1,88 @@
+version: '3.8'
+
+# Development overrides for local development
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+
+services:
+  postgres:
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: dcoder
+      POSTGRES_PASSWORD: localdev
+      POSTGRES_DB: dcoder_platform
+
+  redis:
+    ports:
+      - "6379:6379"
+
+  # Mount local service directories for hot-reload development
+  # Uncomment as services are developed
+
+  # platform-api:
+  #   build:
+  #     context: ../services/platform-api
+  #     dockerfile: Dockerfile.dev
+  #   volumes:
+  #     - ../services/platform-api/src:/app/src
+  #     - ../packages/python:/shared/python
+  #   environment:
+  #     ENVIRONMENT: development
+  #     DEBUG: true
+  #     RELOAD: true
+  #   command: uvicorn src.main:app --reload --host 0.0.0.0 --port 8082
+
+  # kong-gateway:
+  #   volumes:
+  #     - ../services/kong-gateway/config:/etc/kong/custom
+  #   environment:
+  #     KONG_LOG_LEVEL: debug
+
+  # llmops:
+  #   build:
+  #     context: ../services/llmops
+  #     dockerfile: Dockerfile.dev
+  #   volumes:
+  #     - ../services/llmops/src:/app/src
+  #   environment:
+  #     ENVIRONMENT: development
+  #     DEBUG: true
+
+  # agent-orchestrator:
+  #   build:
+  #     context: ../services/agent-orchestrator
+  #     dockerfile: Dockerfile.dev
+  #   volumes:
+  #     - ../services/agent-orchestrator/src:/app/src
+  #   environment:
+  #     ENVIRONMENT: development
+  #     DEBUG: true
+
+  # knowledge-rag:
+  #   build:
+  #     context: ../services/knowledge-rag
+  #     dockerfile: Dockerfile.dev
+  #   volumes:
+  #     - ../services/knowledge-rag/src:/app/src
+  #   environment:
+  #     ENVIRONMENT: development
+  #     DEBUG: true
+
+  # integrations:
+  #   build:
+  #     context: ../services/integrations
+  #     dockerfile: Dockerfile.dev
+  #   volumes:
+  #     - ../services/integrations/src:/app/src
+  #   environment:
+  #     ENVIRONMENT: development
+  #     DEBUG: true
+
+  # client-apps:
+  #   build:
+  #     context: ../services/client-apps
+  #     dockerfile: Dockerfile.dev
+  #   volumes:
+  #     - ../services/client-apps:/app
+  #   environment:
+  #     NODE_ENV: development

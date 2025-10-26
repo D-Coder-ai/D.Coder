@@ -1,0 +1,13 @@
+{
+  "name": "@dcoder/platform-api",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Platform API - Multi-tenancy, authentication, quotas, and governance",
+  "main": "N/A",
+  "scripts": {
+    "dev": "docker-compose up platform-api"
+  },
+  "keywords": ["platform", "api", "multi-tenancy", "auth"],
+  "license": "PROPRIETARY"
+}
+

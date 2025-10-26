@@ -1,0 +1,44 @@
+{
+  "name": "knowledge-rag",
+  "sourceRoot": "services/knowledge-rag/src",
+  "projectType": "application",
+  "targets": {
+    "serve": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "docker-compose up knowledge-rag",
+        "cwd": "{workspaceRoot}"
+      }
+    },
+    "build": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "poetry build",
+        "cwd": "services/knowledge-rag"
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "poetry run pytest",
+        "cwd": "services/knowledge-rag"
+      }
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "poetry run ruff check .",
+        "cwd": "services/knowledge-rag"
+      }
+    },
+    "docker-build": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "docker build -t dcoder/knowledge-rag:latest .",
+        "cwd": "services/knowledge-rag"
+      }
+    }
+  },
+  "tags": ["type:service", "lang:python", "team:rag"]
+}
+

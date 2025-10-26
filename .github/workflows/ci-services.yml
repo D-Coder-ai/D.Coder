@@ -1,0 +1,144 @@
+name: Service CI
+
+on:
+  pull_request:
+    paths:
+      - 'services/**'
+      - 'packages/**'
+      - '.github/workflows/ci-services.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/**'
+      - 'packages/**'
+
+jobs:
+  detect-affected:
+    runs-on: ubuntu-latest
+    outputs:
+      has-changes: ${{ steps.check.outputs.has-changes }}
+      services: ${{ steps.affected.outputs.services }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 8
+      
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+      
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      
+      - name: Check for changes
+        id: check
+        run: |
+          if git diff --quiet origin/main HEAD -- services/ packages/; then
+            echo "has-changes=false" >> $GITHUB_OUTPUT
+          else
+            echo "has-changes=true" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Detect affected services
+        if: steps.check.outputs.has-changes == 'true'
+        id: affected
+        run: |
+          AFFECTED=$(pnpm nx show projects --affected --type=app --base=origin/main)
+          echo "Affected services: $AFFECTED"
+          # Convert to JSON array for matrix
+          SERVICES_JSON=$(echo "$AFFECTED" | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          echo "services=$SERVICES_JSON" >> $GITHUB_OUTPUT
+
+  lint-services:
+    needs: detect-affected
+    if: needs.detect-affected.outputs.has-changes == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: ${{ fromJson(needs.detect-affected.outputs.services) }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 8
+      
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+      
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      
+      - name: Lint ${{ matrix.service }}
+        run: pnpm nx lint ${{ matrix.service }}
+
+  test-services:
+    needs: detect-affected
+    if: needs.detect-affected.outputs.has-changes == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: ${{ fromJson(needs.detect-affected.outputs.services) }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 8
+      
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+      
+      - name: Setup Python (for Python services)
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      
+      - name: Test ${{ matrix.service }}
+        run: pnpm nx test ${{ matrix.service }}
+
+  build-services:
+    needs: detect-affected
+    if: needs.detect-affected.outputs.has-changes == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: ${{ fromJson(needs.detect-affected.outputs.services) }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 8
+      
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+      
+      - name: Setup Python (for Python services)
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      
+      - name: Build ${{ matrix.service }}
+        run: pnpm nx build ${{ matrix.service }}
+

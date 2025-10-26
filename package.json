@@ -1,0 +1,42 @@
+{
+  "name": "dcoder-platform",
+  "version": "1.0.0",
+  "private": true,
+  "description": "D.Coder LLM Platform - Enterprise-grade AI-native infrastructure",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/deloitte/dcoder-platform"
+  },
+  "license": "PROPRIETARY",
+  "workspaces": [
+    "services/*",
+    "packages/python/*",
+    "packages/typescript/*"
+  ],
+  "packageManager": "pnpm@8.15.0",
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "scripts": {
+    "dev": "nx run-many --target=serve --all",
+    "build": "nx run-many --target=build --all",
+    "test": "nx run-many --target=test --all",
+    "lint": "nx run-many --target=lint --all",
+    "graph": "nx graph",
+    "affected:build": "nx affected --target=build",
+    "affected:test": "nx affected --target=test",
+    "affected:lint": "nx affected --target=lint",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,yml,yaml}\"",
+    "changeset": "changeset",
+    "version-packages": "changeset version",
+    "release": "changeset publish"
+  },
+  "devDependencies": {
+    "@changesets/cli": "^2.27.1",
+    "nx": "^18.0.4",
+    "prettier": "^3.2.4",
+    "typescript": "^5.3.3"
+  }
+}
+

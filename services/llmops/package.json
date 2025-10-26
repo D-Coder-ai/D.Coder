@@ -1,0 +1,9 @@
+{
+  "name": "@dcoder/llmops",
+  "version": "1.0.0",
+  "private": true,
+  "description": "LLMOps Platform - Prompt engineering, experimentation, evaluation",
+  "keywords": ["llmops", "prompts", "agenta", "mlflow", "langfuse"],
+  "license": "PROPRIETARY"
+}
+

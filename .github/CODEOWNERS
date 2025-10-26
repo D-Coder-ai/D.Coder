@@ -1,0 +1,52 @@
+# D.Coder Platform Code Owners
+# These owners will be automatically requested for review when someone opens a pull request.
+#
+# Format: path/to/code @owner1 @owner2
+# More specific patterns override less specific ones
+
+# Global owners (fallback)
+* @deloitte/dcoder-platform-team
+
+# Infrastructure
+/infrastructure/ @deloitte/dcoder-infra-team
+/tools/ @deloitte/dcoder-infra-team
+/.github/ @deloitte/dcoder-infra-team
+/docker-compose.yml @deloitte/dcoder-infra-team
+/Makefile @deloitte/dcoder-infra-team
+
+# Gateway Services
+/services/kong-gateway/ @deloitte/dcoder-gateway-team
+/services/litellm-proxy/ @deloitte/dcoder-gateway-team
+
+# Platform API
+/services/platform-api/ @deloitte/dcoder-platform-api-team
+
+# Agent Orchestration
+/services/agent-orchestrator/ @deloitte/dcoder-agents-team
+
+# Knowledge & RAG
+/services/knowledge-rag/ @deloitte/dcoder-rag-team
+
+# Integrations
+/services/integrations/ @deloitte/dcoder-integrations-team
+
+# LLMOps
+/services/llmops/ @deloitte/dcoder-llmops-team
+
+# Client Applications
+/services/client-apps/ @deloitte/dcoder-frontend-team
+
+# Shared Packages
+/packages/python/ @deloitte/dcoder-platform-team
+/packages/typescript/ @deloitte/dcoder-frontend-team
+
+# Documentation
+/docs/ @deloitte/dcoder-platform-team
+/README.md @deloitte/dcoder-platform-team
+/CLAUDE.md @deloitte/dcoder-platform-team
+/CONTRIBUTING.md @deloitte/dcoder-platform-team
+
+# Security-sensitive files
+/.env.example @deloitte/dcoder-security-team
+/infrastructure/auth/ @deloitte/dcoder-security-team
+

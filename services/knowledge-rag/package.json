@@ -1,0 +1,9 @@
+{
+  "name": "@dcoder/knowledge-rag",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Knowledge & RAG service with LlamaIndex and pgvector",
+  "keywords": ["rag", "knowledge", "llamaindex", "pgvector"],
+  "license": "PROPRIETARY"
+}
+

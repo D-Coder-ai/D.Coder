@@ -1,0 +1,54 @@
+{
+  "name": "platform-api",
+  "sourceRoot": "services/platform-api/src",
+  "projectType": "application",
+  "targets": {
+    "serve": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "docker-compose up platform-api",
+        "cwd": "{workspaceRoot}"
+      }
+    },
+    "build": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "poetry build",
+        "cwd": "services/platform-api"
+      },
+      "dependsOn": ["^build"]
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "poetry run pytest",
+        "cwd": "services/platform-api"
+      },
+      "dependsOn": ["build"]
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "poetry run ruff check .",
+        "cwd": "services/platform-api"
+      }
+    },
+    "format": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "poetry run black .",
+        "cwd": "services/platform-api"
+      }
+    },
+    "docker-build": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "docker build -t dcoder/platform-api:latest .",
+        "cwd": "services/platform-api"
+      },
+      "dependsOn": ["build"]
+    }
+  },
+  "tags": ["type:service", "lang:python", "team:platform"]
+}
+

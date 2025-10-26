@@ -1,0 +1,13 @@
+{
+  "name": "@dcoder/litellm-proxy",
+  "version": "1.0.0",
+  "private": true,
+  "description": "LiteLLM Proxy service for LLM routing with caching and compression",
+  "main": "N/A",
+  "scripts": {
+    "dev": "docker-compose up litellm-proxy"
+  },
+  "keywords": ["llm", "proxy", "litellm", "caching"],
+  "license": "PROPRIETARY"
+}
+

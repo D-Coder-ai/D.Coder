@@ -1,0 +1,9 @@
+{
+  "name": "@dcoder/integrations",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Integrations service for external system connectivity",
+  "keywords": ["integrations", "jira", "bitbucket", "confluence"],
+  "license": "PROPRIETARY"
+}
+

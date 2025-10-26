@@ -1,0 +1,4 @@
+---
+alwaysApply: true
+---
+When suggesting any terminal, powershell or cmd commands, always check the operating system and suggest accordingly. If the command involves installation, removal or usage of a third-party library or tool, always do a web search and an exa search (mcp) to get proper information on how it can be run on the given operating system. 

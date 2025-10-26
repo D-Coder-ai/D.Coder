@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  agent-orchestrator:
+    build: .
+    ports:
+      - "8083:8083"
+    environment:
+      SERVICE_NAME: agent-orchestrator
+      SERVICE_PORT: 8083
+      DEBUG: "true"
+    volumes:
+      - ./src:/app/src

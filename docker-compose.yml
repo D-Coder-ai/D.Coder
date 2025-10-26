@@ -1,0 +1,205 @@
+version: '3.8'
+
+# D.Coder Platform - Root Orchestrator
+# This compose file extends the base infrastructure and adds all services
+# Use this for full stack development
+
+# Include base infrastructure
+include:
+  - infrastructure/docker-compose.base.yml
+
+networks:
+  dcoder-network:
+    driver: bridge
+    external: false
+
+services:
+  # ==================== Gateway Services ====================
+  kong-gateway:
+    build:
+      context: ./services/kong-gateway
+      dockerfile: Dockerfile
+    container_name: dcoder-kong-gateway
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /etc/kong/config/kong.yaml
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_ADMIN_ACCESS_LOG: /dev/stdout
+      KONG_PROXY_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_LISTEN: 0.0.0.0:8001
+      KONG_PROXY_LISTEN: 0.0.0.0:8000
+      KONG_STATUS_LISTEN: 0.0.0.0:8100
+      KONG_LOG_LEVEL: debug
+      # Provider API Keys from .env
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+    ports:
+      - "8000:8000"  # Proxy
+      - "8001:8001"  # Admin API
+      - "8100:8100"  # Status
+    volumes:
+      - ./services/kong-gateway/config:/etc/kong/config:ro
+    networks:
+      - dcoder-network
+    profiles:
+      - full
+      - gateways
+
+  litellm-proxy:
+    build:
+      context: ./services/litellm-proxy
+      dockerfile: Dockerfile
+    container_name: dcoder-litellm-proxy
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      # Provider API Keys
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      # LiteLLM Config
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-sk-1234567890abcdef}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      DATABASE_URL: postgresql://litellm:${LITELLM_DB_PASSWORD:-changeme}@postgres:5432/litellm
+      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
+      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./services/litellm-proxy/config:/app/config:ro
+      - ./packages/python:/app/packages/python:ro
+    networks:
+      - dcoder-network
+    profiles:
+      - full
+      - gateways
+
+  # ==================== Platform Services ====================
+  platform-api:
+    build:
+      context: ./services/platform-api
+      dockerfile: Dockerfile
+    container_name: dcoder-platform-api
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-dcoder}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-dcoder_platform}
+      REDIS_URL: redis://redis:6379
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    ports:
+      - "8082:8082"
+    volumes:
+      - ./services/platform-api/src:/app/src:ro
+      - ./packages/python:/app/packages/python:ro
+    networks:
+      - dcoder-network
+    profiles:
+      - full
+      - services
+
+  agent-orchestrator:
+    build:
+      context: ./services/agent-orchestrator
+      dockerfile: Dockerfile
+    container_name: dcoder-agent-orchestrator
+    depends_on:
+      - temporal
+      - nats
+    environment:
+      TEMPORAL_HOST: temporal:7233
+      NATS_URL: nats://nats:4222
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    ports:
+      - "8083:8083"
+    volumes:
+      - ./services/agent-orchestrator/src:/app/src:ro
+      - ./packages/python:/app/packages/python:ro
+    networks:
+      - dcoder-network
+    profiles:
+      - full
+      - services
+
+  knowledge-rag:
+    build:
+      context: ./services/knowledge-rag
+      dockerfile: Dockerfile
+    container_name: dcoder-knowledge-rag
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-dcoder}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-dcoder_platform}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    ports:
+      - "8084:8084"
+    volumes:
+      - ./services/knowledge-rag/src:/app/src:ro
+      - ./packages/python:/app/packages/python:ro
+    networks:
+      - dcoder-network
+    profiles:
+      - full
+      - services
+
+  integrations:
+    build:
+      context: ./services/integrations
+      dockerfile: Dockerfile
+    container_name: dcoder-integrations
+    depends_on:
+      - redis
+      - nats
+    environment:
+      REDIS_URL: redis://redis:6379
+      NATS_URL: nats://nats:4222
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    ports:
+      - "8085:8085"
+    volumes:
+      - ./services/integrations/src:/app/src:ro
+      - ./packages/python:/app/packages/python:ro
+    networks:
+      - dcoder-network
+    profiles:
+      - full
+      - services
+
+  llmops:
+    build:
+      context: ./services/llmops
+      dockerfile: Dockerfile
+    container_name: dcoder-llmops
+    environment:
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    ports:
+      - "8081:8081"
+    volumes:
+      - ./services/llmops/src:/app/src:ro
+      - ./packages/python:/app/packages/python:ro
+    networks:
+      - dcoder-network
+    profiles:
+      - full
+      - services
+
+# Default profile runs infrastructure only
+# Use: docker-compose --profile full up -d   # for everything
+# Use: docker-compose --profile gateways up -d  # for infra + gateways
+# Use: docker-compose --profile services up -d  # for infra + services
+

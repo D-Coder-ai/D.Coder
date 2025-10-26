@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  knowledge-rag:
+    build: .
+    ports:
+      - "8084:8084"
+    environment:
+      SERVICE_NAME: knowledge-rag
+      SERVICE_PORT: 8084
+      DEBUG: "true"
+    volumes:
+      - ./src:/app/src

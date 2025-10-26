@@ -1,0 +1,44 @@
+{
+  "name": "litellm-proxy",
+  "sourceRoot": "services/litellm-proxy",
+  "projectType": "application",
+  "targets": {
+    "serve": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "docker-compose up litellm-proxy",
+        "cwd": "{workspaceRoot}"
+      }
+    },
+    "build": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "pip install -r requirements.txt",
+        "cwd": "services/litellm-proxy"
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "pytest tests/",
+        "cwd": "services/litellm-proxy"
+      }
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "ruff check .",
+        "cwd": "services/litellm-proxy"
+      }
+    },
+    "docker-build": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "docker build -t dcoder/litellm-proxy:latest .",
+        "cwd": "services/litellm-proxy"
+      }
+    }
+  },
+  "tags": ["type:gateway", "lang:python", "team:gateway"]
+}
+

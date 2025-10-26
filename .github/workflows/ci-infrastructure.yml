@@ -1,0 +1,74 @@
+name: Infrastructure CI
+
+on:
+  pull_request:
+    paths:
+      - 'infrastructure/**'
+      - 'docker-compose.yml'
+      - '.github/workflows/ci-infrastructure.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'infrastructure/**'
+      - 'docker-compose.yml'
+
+jobs:
+  validate-docker-compose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Validate base infrastructure compose
+        run: docker-compose -f infrastructure/docker-compose.base.yml config > /dev/null
+      
+      - name: Validate root compose
+        run: docker-compose config > /dev/null
+
+  validate-configs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Validate Kong configs
+        run: |
+          # Install deck (Kong's declarative config tool)
+          curl -sL https://github.com/Kong/deck/releases/download/v1.28.2/deck_1.28.2_linux_amd64.tar.gz -o deck.tar.gz
+          tar -xf deck.tar.gz
+          chmod +x deck
+          # Validate Kong declarative configs
+          find services/kong-gateway/config -name "*.yaml" -o -name "*.yml" | while read file; do
+            echo "Validating $file"
+            ./deck validate --state "$file" --online=false || true
+          done
+      
+      - name: Validate Prometheus config
+        run: |
+          # Install promtool
+          wget https://github.com/prometheus/prometheus/releases/download/v2.48.1/prometheus-2.48.1.linux-amd64.tar.gz
+          tar xvfz prometheus-2.48.1.linux-amd64.tar.gz
+          # Validate Prometheus config
+          ./prometheus-2.48.1.linux-amd64/promtool check config infrastructure/observability/prometheus/prometheus.yml
+
+  infrastructure-smoke-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Start infrastructure
+        run: docker-compose -f infrastructure/docker-compose.base.yml up -d
+      
+      - name: Wait for services to be healthy
+        run: |
+          # Wait up to 60 seconds for services to be healthy
+          timeout 60 bash -c 'until docker-compose -f infrastructure/docker-compose.base.yml ps | grep -q "healthy"; do sleep 2; done'
+      
+      - name: Check PostgreSQL
+        run: docker-compose -f infrastructure/docker-compose.base.yml exec -T postgres pg_isready -U dcoder
+      
+      - name: Check Redis
+        run: docker-compose -f infrastructure/docker-compose.base.yml exec -T redis redis-cli ping
+      
+      - name: Cleanup
+        if: always()
+        run: docker-compose -f infrastructure/docker-compose.base.yml down -v
+

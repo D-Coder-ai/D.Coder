@@ -1,0 +1,88 @@
+name: Docker Build & Push
+
+on:
+  push:
+    branches: [main]
+    tags:
+      - 'v*'
+  pull_request:
+    paths:
+      - 'services/**/Dockerfile'
+      - '.github/workflows/docker-build.yml'
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  detect-changed-services:
+    runs-on: ubuntu-latest
+    outputs:
+      services: ${{ steps.changed.outputs.services }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Detect changed Dockerfiles
+        id: changed
+        run: |
+          # Get changed Dockerfiles
+          CHANGED_DOCKERFILES=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep 'services/.*/Dockerfile' || echo "")
+          
+          if [ -z "$CHANGED_DOCKERFILES" ]; then
+            echo "services=[]" >> $GITHUB_OUTPUT
+          else
+            # Extract service names
+            SERVICES=$(echo "$CHANGED_DOCKERFILES" | sed 's|services/\(.*\)/Dockerfile|\1|' | jq -R -s -c 'split("\n") | map(select(length > 0))')
+            echo "services=$SERVICES" >> $GITHUB_OUTPUT
+          fi
+
+  build-and-push:
+    needs: detect-changed-services
+    if: needs.detect-changed-services.outputs.services != '[]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        service: ${{ fromJson(needs.detect-changed-services.outputs.services) }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Log in to Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.service }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix={{branch}}-
+      
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: services/${{ matrix.service }}/Dockerfile
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+

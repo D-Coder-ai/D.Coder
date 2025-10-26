@@ -1,0 +1,13 @@
+{
+  "name": "@dcoder/kong-gateway",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Kong Gateway service for platform routing",
+  "main": "N/A",
+  "scripts": {
+    "dev": "docker-compose up kong-gateway"
+  },
+  "keywords": ["gateway", "kong", "routing"],
+  "license": "PROPRIETARY"
+}
+

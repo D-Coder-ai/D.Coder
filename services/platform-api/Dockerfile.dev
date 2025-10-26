@@ -1,0 +1,25 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    postgresql-client \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install development tools
+RUN pip install --no-cache-dir watchfiles ipdb
+
+# Copy requirements
+COPY requirements.txt requirements-dev.txt ./
+RUN pip install --no-cache-dir -r requirements-dev.txt
+
+# Set Python path for shared libraries
+ENV PYTHONPATH=/app:/shared/python
+
+EXPOSE 8082
+
+# Run with hot reload
+CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8082", "--reload", "--reload-dir", "src"]

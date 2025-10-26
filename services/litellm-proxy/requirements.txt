@@ -1,0 +1,24 @@
+# LiteLLM Proxy Requirements
+# Core LiteLLM with proxy support
+litellm[proxy]>=1.50.0
+
+# Prompt Compression
+llmlingua>=0.2.0
+transformers>=4.35.0
+torch>=2.1.0
+
+# Monitoring and Metrics
+prometheus-client>=0.19.0
+
+# Database
+psycopg2-binary>=2.9.0
+
+# Redis
+redis>=5.0.0
+
+# HTTP client
+httpx>=0.25.0
+
+# Utilities
+python-dotenv>=1.0.0
+

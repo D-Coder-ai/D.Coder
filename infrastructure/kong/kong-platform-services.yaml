@@ -1,0 +1,198 @@
+_format_version: "3.0"
+
+# Kong Gateway Configuration for D.Coder R1
+# Role: Platform Service Routing (non-LLM)
+# LLM routing handled by LiteLLM Proxy (port 4000)
+
+services:
+  # ==================== Platform API ====================
+  - name: platform-api
+    url: http://platform-api:8082
+    tags: [r1, platform-service]
+    routes:
+      - name: platform-tenants
+        paths: [/v1/tenants]
+        strip_path: false
+        tags: [r1, platform-route]
+        plugins:
+          - name: rate-limiting
+            config:
+              policy: redis
+              redis:
+                host: redis
+                port: 6379
+              limit_by: header
+              header_name: X-Tenant-Id
+              minute: 1000
+              fault_tolerant: true
+          - name: prometheus
+            config:
+              per_consumer: true
+      
+      - name: platform-providers
+        paths: [/v1/providers]
+        strip_path: false
+        tags: [r1, platform-route]
+        plugins:
+          - name: rate-limiting
+            config:
+              policy: redis
+              redis:
+                host: redis
+                port: 6379
+              limit_by: header
+              header_name: X-Tenant-Id
+              minute: 1000
+              fault_tolerant: true
+      
+      - name: platform-quotas
+        paths: [/v1/quotas]
+        strip_path: false
+        tags: [r1, platform-route]
+        plugins:
+          - name: rate-limiting
+            config:
+              policy: redis
+              redis:
+                host: redis
+                port: 6379
+              limit_by: header
+              header_name: X-Tenant-Id
+              minute: 1000
+              fault_tolerant: true
+      
+      - name: platform-usage
+        paths: [/v1/usage]
+        strip_path: false
+        tags: [r1, platform-route]
+        plugins:
+          - name: rate-limiting
+            config:
+              policy: redis
+              redis:
+                host: redis
+                port: 6379
+              limit_by: header
+              header_name: X-Tenant-Id
+              minute: 1000
+              fault_tolerant: true
+
+  # ==================== Agent Orchestration Service ====================
+  - name: agent-orchestrator
+    url: http://agent-orchestrator:8083
+    tags: [r1, platform-service]
+    routes:
+      - name: agent-orchestrator-route
+        paths: [/v1/agents, /v1/workflows, /v1/temporal]
+        strip_path: false
+        tags: [r1, platform-route]
+        plugins:
+          - name: rate-limiting
+            config:
+              policy: redis
+              redis:
+                host: redis
+                port: 6379
+              limit_by: header
+              header_name: X-Tenant-Id
+              minute: 1000
+              fault_tolerant: true
+          - name: prometheus
+            config:
+              per_consumer: true
+
+  # ==================== Knowledge & RAG Service ====================
+  - name: knowledge-rag
+    url: http://knowledge-rag:8084
+    tags: [r1, platform-service]
+    routes:
+      - name: knowledge-rag-route
+        paths: [/v1/knowledge, /v1/documents, /v1/search]
+        strip_path: false
+        tags: [r1, platform-route]
+        plugins:
+          - name: rate-limiting
+            config:
+              policy: redis
+              redis:
+                host: redis
+                port: 6379
+              limit_by: header
+              header_name: X-Tenant-Id
+              minute: 2000  # Higher limit for RAG queries
+              fault_tolerant: true
+          - name: prometheus
+            config:
+              per_consumer: true
+
+  # ==================== Integrations Service ====================
+  - name: integrations
+    url: http://integrations:8085
+    tags: [r1, platform-service]
+    routes:
+      - name: integrations-route
+        paths: [/v1/jira, /v1/bitbucket, /v1/confluence, /v1/sharepoint]
+        strip_path: false
+        tags: [r1, platform-route]
+        plugins:
+          - name: rate-limiting
+            config:
+              policy: redis
+              redis:
+                host: redis
+                port: 6379
+              limit_by: header
+              header_name: X-Tenant-Id
+              minute: 500
+              fault_tolerant: true
+          - name: prometheus
+            config:
+              per_consumer: true
+
+  # ==================== LLMOps Platform Service ====================
+  - name: llmops
+    url: http://llmops:8081
+    tags: [r1, platform-service]
+    routes:
+      - name: llmops-route
+        paths: [/v1/experiments, /v1/evaluations, /v1/prompts]
+        strip_path: false
+        tags: [r1, platform-route]
+        plugins:
+          - name: rate-limiting
+            config:
+              policy: redis
+              redis:
+                host: redis
+                port: 6379
+              limit_by: header
+              header_name: X-Tenant-Id
+              minute: 1000
+              fault_tolerant: true
+          - name: prometheus
+            config:
+              per_consumer: true
+
+# Global Plugins
+plugins:
+  - name: prometheus
+    config:
+      status_code_metrics: true
+      latency_metrics: true
+      bandwidth_metrics: true
+      upstream_health_metrics: true
+
+  - name: correlation-id
+    config:
+      header_name: X-Correlation-ID
+      generator: uuid
+      echo_downstream: true
+
+  - name: request-id
+    config:
+      header_name: X-Request-ID
+      generator: uuid
+      echo_downstream: true
+
+
+

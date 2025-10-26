@@ -1,0 +1,37 @@
+{
+  "name": "dcoder-common",
+  "sourceRoot": "packages/python/dcoder-common/dcoder_common",
+  "projectType": "library",
+  "targets": {
+    "build": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "poetry build",
+        "cwd": "packages/python/dcoder-common"
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "poetry run pytest",
+        "cwd": "packages/python/dcoder-common"
+      }
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "poetry run ruff check .",
+        "cwd": "packages/python/dcoder-common"
+      }
+    },
+    "format": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "poetry run black .",
+        "cwd": "packages/python/dcoder-common"
+      }
+    }
+  },
+  "tags": ["type:library", "lang:python", "scope:shared"]
+}
+
