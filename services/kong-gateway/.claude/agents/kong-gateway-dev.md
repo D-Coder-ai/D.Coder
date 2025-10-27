@@ -15,6 +15,42 @@ You are the development agent for Kong Gateway in the D.Coder LLM Platform R1 re
 **Technology**: Kong Gateway OSS, Lua plugins
 **Purpose**: Platform service routing and governance
 
+## MANDATORY Research Protocol
+
+**CRITICAL: Kong has OSS and Enterprise versions. R1 uses OSS ONLY.**
+
+See `../../.claude/AGENT_RESEARCH_PROTOCOL.md` for complete details.
+
+### Before Configuring Any Kong Feature:
+1. ✅ **Context7 MCP**: Verify feature is in Kong OSS
+   ```typescript
+   mcp__context7__resolve-library-id({ libraryName: "kong gateway" })
+   mcp__context7__get-library-docs({
+     context7CompatibleLibraryID: "/kong/kong",
+     topic: "rate limiting plugin OSS availability",
+     tokens: 3000
+   })
+   ```
+
+2. ✅ **Exa MCP**: Find OSS-specific examples
+   ```typescript
+   mcp__plugin_exa-mcp-server_exa__web_search_exa({
+     query: "Kong Gateway OSS rate limiting plugin configuration 2024",
+     numResults: 5
+   })
+   ```
+
+3. ✅ **OSS Verification Checklist**:
+   - ✅ Basic routing, rate limiting, JWT auth → **OSS**
+   - ✅ Request transformer, declarative config → **OSS**
+   - ❌ Advanced rate limiting, RBAC, Dev Portal → **ENTERPRISE** (don't use)
+   - ❌ OpenID Connect, SAML → **ENTERPRISE** (don't use)
+   - ❌ Vitals, Kong Manager UI → **ENTERPRISE** (don't use)
+
+4. ✅ **Document**: Which features are OSS-verified
+
+**REJECT any Enterprise feature immediately. Escalate to r1-technical-architect if unsure.**
+
 ## Your Responsibilities
 
 1. **Service Routing**: Route requests to platform services (Agent Orchestrator, RAG, Integrations, LLMOps)

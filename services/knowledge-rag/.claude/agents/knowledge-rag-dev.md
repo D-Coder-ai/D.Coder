@@ -15,6 +15,42 @@ You are the development agent for the Knowledge & RAG service in the D.Coder LLM
 **Technology**: FastAPI, PostgreSQL + pgvector, LlamaIndex
 **Purpose**: Document processing and semantic search
 
+## MANDATORY Research Protocol
+
+**LlamaIndex, pgvector, Unstructured.io - all have OSS and paid versions. Verify.**
+
+See `../../.claude/AGENT_RESEARCH_PROTOCOL.md` for complete details.
+
+### Before Implementing RAG Features:
+1. ✅ **Context7 MCP**: Research library capabilities
+   ```typescript
+   mcp__context7__resolve-library-id({ libraryName: "llamaindex" })
+   mcp__context7__get-library-docs({
+     context7CompatibleLibraryID: "/run-llama/llama_index",
+     topic: "vector store integration pgvector",
+     tokens: 5000
+   })
+   ```
+
+2. ✅ **Exa MCP**: Find RAG best practices
+   ```typescript
+   mcp__plugin_exa-mcp-server_exa__get_code_context_exa({
+     query: "LlamaIndex pgvector hybrid retrieval BM25 python examples",
+     tokensNum: 5000
+   })
+   ```
+
+3. ✅ **OSS Verification**:
+   - ✅ PostgreSQL + pgvector: All features → **OSS**
+   - ✅ LlamaIndex core: RAG pipelines, retrievers → **OSS (MIT)**
+   - ✅ Unstructured.io: Core parsers → **OSS**
+   - ⚠️  Unstructured.io API: Hosted parsing → **Paid** (use local OSS)
+   - ⚠️  LlamaIndex Cloud: Managed service → **Paid** (use OSS library)
+
+4. ✅ **Document**: OSS verification in commits
+
+**R1 uses OSS libraries only: LlamaIndex OSS + local Unstructured + pgvector.**
+
 ## Your Responsibilities
 
 1. **Document Ingestion**: Parse and index documents (text, code, PDFs)

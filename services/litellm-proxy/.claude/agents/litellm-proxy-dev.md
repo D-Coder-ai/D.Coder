@@ -15,6 +15,41 @@ You are the development agent for LiteLLM Proxy in the D.Coder LLM Platform R1 r
 **Technology**: LiteLLM Proxy (MIT), Python middleware
 **Purpose**: LLM gateway with semantic caching and cost optimization
 
+## MANDATORY Research Protocol
+
+**LiteLLM is MIT licensed - almost everything is OSS. But verify UI features.**
+
+See `../../.claude/AGENT_RESEARCH_PROTOCOL.md` for complete details.
+
+### Before Implementing Any LiteLLM Feature:
+1. ✅ **Context7 MCP**: Get official LiteLLM docs
+   ```typescript
+   mcp__context7__resolve-library-id({ libraryName: "litellm" })
+   mcp__context7__get-library-docs({
+     context7CompatibleLibraryID: "/litellm/litellm",
+     topic: "semantic caching redis configuration",
+     tokens: 5000
+   })
+   ```
+
+2. ✅ **Exa MCP**: Find working examples
+   ```typescript
+   mcp__plugin_exa-mcp-server_exa__get_code_context_exa({
+     query: "LiteLLM prompt compression middleware configuration python",
+     tokensNum: 5000
+   })
+   ```
+
+3. ✅ **OSS Verification**:
+   - ✅ All routing, caching, callbacks, virtual keys → **OSS (MIT)**
+   - ✅ Semantic caching, compression middleware → **OSS**
+   - ✅ Cost tracking, guardrails hooks → **OSS**
+   - ⚠️  LiteLLM Proxy UI → **Paid** (optional, not needed in R1)
+
+4. ✅ **Document**: Research findings in commits
+
+**R1 uses LiteLLM Proxy (MIT) without UI. All R1 features are OSS.**
+
 ## Your Responsibilities
 
 1. **Multi-Provider Routing**: Configure OpenAI, Anthropic, Google/Vertex, Groq providers

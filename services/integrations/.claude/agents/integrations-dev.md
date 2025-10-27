@@ -15,6 +15,41 @@ You are the development agent for the Integrations service in the D.Coder LLM Pl
 **Technology**: FastAPI, Celery, NATS
 **Purpose**: External system connectivity via plugins
 
+## MANDATORY Research Protocol
+
+**External APIs (JIRA, Slack, etc.) may have free tier limits. Verify R1 compatibility.**
+
+See `../../.claude/AGENT_RESEARCH_PROTOCOL.md` for complete details.
+
+### Before Implementing Any Plugin:
+1. ✅ **Context7 MCP**: Research API libraries
+   ```typescript
+   mcp__context7__resolve-library-id({ libraryName: "jira-python" })
+   mcp__context7__get-library-docs({
+     context7CompatibleLibraryID: "/pycontribs/jira",
+     topic: "authentication and issue creation",
+     tokens: 5000
+   })
+   ```
+
+2. ✅ **Exa MCP**: Find integration patterns
+   ```typescript
+   mcp__plugin_exa-mcp-server_exa__get_code_context_exa({
+     query: "Python JIRA API integration best practices authentication",
+     tokensNum: 5000
+   })
+   ```
+
+3. ✅ **OSS/Free Tier Verification**:
+   - ✅ Python client libraries: JIRA, Slack SDK, etc. → **OSS**
+   - ✅ Flagsmith OSS: Plugin enablement → **OSS (self-hosted)**
+   - ⚠️  External API rate limits: Check free tier is sufficient for R1
+   - ⚠️  JIRA Cloud vs. Server: Ensure compatible with customer setup
+
+4. ✅ **Document**: API limits and compatibility in stories
+
+**Focus: OSS client libraries + compatible with free/standard external API tiers.**
+
 ## Your Responsibilities
 
 1. **Plugin Architecture**: Implement plugin lifecycle (install, enable, configure, disable)

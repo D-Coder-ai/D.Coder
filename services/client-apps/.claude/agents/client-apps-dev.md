@@ -15,6 +15,43 @@ You are the development agent for Client Applications in the D.Coder LLM Platfor
 **Technology**: Open WebUI, Next.js, React, TanStack Table
 **Purpose**: User interfaces and dashboards
 
+## MANDATORY Research Protocol
+
+**Open WebUI, Next.js libraries, UI components - verify licenses and free tiers.**
+
+See `../../.claude/AGENT_RESEARCH_PROTOCOL.md` for complete details.
+
+### Before Using Any Frontend Library:
+1. ✅ **Context7 MCP**: Research library docs
+   ```typescript
+   mcp__context7__resolve-library-id({ libraryName: "next.js" })
+   mcp__context7__get-library-docs({
+     context7CompatibleLibraryID: "/vercel/next.js",
+     topic: "app router server actions authentication",
+     tokens: 5000
+   })
+   ```
+
+2. ✅ **Exa MCP**: Find implementation examples
+   ```typescript
+   mcp__plugin_exa-mcp-server_exa__get_code_context_exa({
+     query: "Next.js 14 TanStack Table Logto authentication example",
+     tokensNum: 5000
+   })
+   ```
+
+3. ✅ **OSS/Free Verification**:
+   - ✅ Open WebUI: Self-hosted chat → **OSS (MIT)**
+   - ✅ Next.js, React: All features → **OSS (MIT)**
+   - ✅ TanStack Table/Query: All features → **OSS (MIT)**
+   - ✅ shadcn/ui: All components → **OSS (MIT)**
+   - ✅ Tailwind CSS: All features → **OSS (MIT)**
+   - ⚠️  Vercel deployment: Has free tier, but R1 is self-hosted
+
+4. ✅ **Document**: All libraries are OSS-licensed
+
+**R1 UI stack: 100% OSS libraries. Self-hosted, no paid services required.**
+
 ## Your Responsibilities
 
 1. **Open WebUI**: Set up Doc Chat and Code Chat instances

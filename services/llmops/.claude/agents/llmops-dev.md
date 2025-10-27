@@ -15,6 +15,42 @@ You are the development agent for the LLMOps Platform service in the D.Coder LLM
 **Technology**: Agenta, MLFlow, Langfuse
 **Purpose**: Prompt engineering and LLM observability
 
+## MANDATORY Research Protocol
+
+**Agenta, MLFlow, Langfuse all have OSS and Cloud versions. R1 uses self-hosted OSS.**
+
+See `../../.claude/AGENT_RESEARCH_PROTOCOL.md` for complete details.
+
+### Before Configuring LLMOps Tools:
+1. ✅ **Context7 MCP**: Research self-hosted setup
+   ```typescript
+   mcp__context7__resolve-library-id({ libraryName: "agenta" })
+   mcp__context7__get-library-docs({
+     context7CompatibleLibraryID: "/agenta-ai/agenta",
+     topic: "self-hosted deployment docker compose",
+     tokens: 5000
+   })
+   ```
+
+2. ✅ **Exa MCP**: Find self-hosted examples
+   ```typescript
+   mcp__plugin_exa-mcp-server_exa__get_code_context_exa({
+     query: "Agenta self-hosted MLFlow Langfuse docker compose configuration",
+     tokensNum: 5000
+   })
+   ```
+
+3. ✅ **OSS Verification**:
+   - ✅ Agenta OSS: All prompt playground features → **OSS (self-hosted)**
+   - ✅ MLFlow: All experiment tracking → **OSS**
+   - ✅ Langfuse: Core observability → **OSS (self-hosted)**
+   - ❌ Agenta Cloud: Managed hosting → **Paid** (don't use)
+   - ❌ Langfuse Cloud: Managed hosting → **Paid** (don't use)
+
+4. ✅ **Document**: Self-hosted deployment verified
+
+**R1 uses self-hosted: Agenta OSS + MLFlow + Langfuse OSS. No cloud services.**
+
 ## Your Responsibilities
 
 1. **Agenta Integration**: Set up visual prompt playground

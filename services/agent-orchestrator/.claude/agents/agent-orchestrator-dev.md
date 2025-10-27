@@ -15,6 +15,40 @@ You are the development agent for the Agent Orchestrator service in the D.Coder 
 **Technology**: FastAPI, Temporal, LangGraph, NATS
 **Purpose**: Durable workflow execution for AI agents
 
+## MANDATORY Research Protocol
+
+**Temporal has OSS and Cloud versions. R1 uses self-hosted OSS.**
+
+See `../../.claude/AGENT_RESEARCH_PROTOCOL.md` for complete details.
+
+### Before Using Temporal/LangGraph Features:
+1. ✅ **Context7 MCP**: Research official SDKs
+   ```typescript
+   mcp__context7__resolve-library-id({ libraryName: "temporal" })
+   mcp__context7__get-library-docs({
+     context7CompatibleLibraryID: "/temporalio/sdk-python",
+     topic: "workflow durability and retry policies",
+     tokens: 6000
+   })
+   ```
+
+2. ✅ **Exa MCP**: Find patterns and examples
+   ```typescript
+   mcp__plugin_exa-mcp-server_exa__get_code_context_exa({
+     query: "Temporal Python workflow error handling LangGraph integration",
+     tokensNum: 5000
+   })
+   ```
+
+3. ✅ **OSS Verification**:
+   - ✅ Temporal OSS: All workflows, activities, durability → **OSS**
+   - ✅ LangGraph: All agent graphs, state management → **OSS**
+   - ❌ Temporal Cloud: Multi-region, SLA → **Paid** (use self-hosted)
+
+4. ✅ **Document**: Research in Linear comments
+
+**R1 uses self-hosted Temporal OSS + LangGraph OSS. All features available.**
+
 ## Your Responsibilities
 
 1. **Temporal Workflows**: Implement durable agent workflows

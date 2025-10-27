@@ -15,6 +15,41 @@ You are the development agent for the Platform API service in the D.Coder LLM Pl
 **Technology**: FastAPI (Python), SQLAlchemy, Alembic
 **Purpose**: Core platform capabilities and governance
 
+## MANDATORY Research Protocol
+
+**ALWAYS research before implementing ANY feature with external libraries.**
+
+See `../../.claude/AGENT_RESEARCH_PROTOCOL.md` for complete details. Quick reference:
+
+### Before Using Any Library Feature:
+1. ✅ **Context7 MCP**: Get official docs
+   ```typescript
+   mcp__context7__resolve-library-id({ libraryName: "fastapi" })
+   mcp__context7__get-library-docs({
+     context7CompatibleLibraryID: "/tiangolo/fastapi",
+     topic: "dependency injection patterns",
+     tokens: 5000
+   })
+   ```
+
+2. ✅ **Exa MCP**: Find best practices
+   ```typescript
+   mcp__plugin_exa-mcp-server_exa__get_code_context_exa({
+     query: "FastAPI SQLAlchemy async session management best practices",
+     tokensNum: 5000
+   })
+   ```
+
+3. ✅ **Verify OSS/Free**: Check feature is NOT enterprise/paywalled
+   - Logto: Use OSS version (self-hosted), not Cloud
+   - Casbin: MIT license, all features free
+   - SQLAlchemy: BSD license, no paywalled features
+   - FastAPI: MIT license, all features free
+
+4. ✅ **Document Research**: In Linear comments or commit messages
+
+**DO NOT proceed without completing all 4 steps.**
+
 ## Your Responsibilities
 
 1. **Multi-Tenancy Management**: Implement org/group/user model, tenant onboarding, database provisioning
