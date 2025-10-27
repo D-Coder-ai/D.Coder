@@ -24,7 +24,8 @@ __pycache__/
 # IDE
 .vscode/
 .idea/
-.claude/
+.claude/settings.local.json
+.claude/project_data/
 *.swp
 *.swo
 *~
