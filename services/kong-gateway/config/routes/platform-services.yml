@@ -1,0 +1,338 @@
+_format_version: "3.0"
+
+# Kong Gateway Configuration for D.Coder R1 Platform Services
+# Role: Platform Service Routing (non-LLM)
+# LLM routing handled separately in config/kong.yml
+
+services:
+  # ==================== Platform API ====================
+  - name: platform-api
+    url: http://platform-api:8082
+    tags: [r1, platform-service]
+    routes:
+      - name: platform-tenants
+        paths: [/v1/tenants]
+        strip_path: false
+        tags: [r1, platform-route]
+        plugins:
+          - name: rate-limiting
+            config:
+              policy: redis
+              redis:
+                host: redis
+                port: 6379
+                database: 0
+              limit_by: header
+              header_name: X-Tenant-Id
+              minute: 1000
+              fault_tolerant: true
+              hide_client_headers: false
+      
+      - name: platform-providers
+        paths: [/v1/providers]
+        strip_path: false
+        tags: [r1, platform-route]
+        plugins:
+          - name: rate-limiting
+            config:
+              policy: redis
+              redis:
+                host: redis
+                port: 6379
+                database: 0
+              limit_by: header
+              header_name: X-Tenant-Id
+              minute: 1000
+              fault_tolerant: true
+              hide_client_headers: false
+      
+      - name: platform-quotas
+        paths: [/v1/quotas]
+        strip_path: false
+        tags: [r1, platform-route]
+        plugins:
+          - name: rate-limiting
+            config:
+              policy: redis
+              redis:
+                host: redis
+                port: 6379
+                database: 0
+              limit_by: header
+              header_name: X-Tenant-Id
+              minute: 1000
+              fault_tolerant: true
+              hide_client_headers: false
+      
+      - name: platform-usage
+        paths: [/v1/usage]
+        strip_path: false
+        tags: [r1, platform-route]
+        plugins:
+          - name: rate-limiting
+            config:
+              policy: redis
+              redis:
+                host: redis
+                port: 6379
+                database: 0
+              limit_by: header
+              header_name: X-Tenant-Id
+              minute: 1000
+              fault_tolerant: true
+              hide_client_headers: false
+
+  # ==================== Agent Orchestration Service ====================
+  - name: agent-orchestrator
+    url: http://agent-orchestrator:8083
+    tags: [r1, platform-service]
+    routes:
+      - name: agent-orchestrator-agents
+        paths: [/v1/agents]
+        strip_path: false
+        tags: [r1, platform-route]
+        plugins:
+          - name: rate-limiting
+            config:
+              policy: redis
+              redis:
+                host: redis
+                port: 6379
+                database: 0
+              limit_by: header
+              header_name: X-Tenant-Id
+              minute: 1000
+              fault_tolerant: true
+              hide_client_headers: false
+      
+      - name: agent-orchestrator-workflows
+        paths: [/v1/workflows]
+        strip_path: false
+        tags: [r1, platform-route]
+        plugins:
+          - name: rate-limiting
+            config:
+              policy: redis
+              redis:
+                host: redis
+                port: 6379
+                database: 0
+              limit_by: header
+              header_name: X-Tenant-Id
+              minute: 1000
+              fault_tolerant: true
+              hide_client_headers: false
+      
+      - name: agent-orchestrator-temporal
+        paths: [/v1/temporal]
+        strip_path: false
+        tags: [r1, platform-route]
+        plugins:
+          - name: rate-limiting
+            config:
+              policy: redis
+              redis:
+                host: redis
+                port: 6379
+                database: 0
+              limit_by: header
+              header_name: X-Tenant-Id
+              minute: 1000
+              fault_tolerant: true
+              hide_client_headers: false
+
+  # ==================== Knowledge & RAG Service ====================
+  - name: knowledge-rag
+    url: http://knowledge-rag:8084
+    tags: [r1, platform-service]
+    routes:
+      - name: knowledge-rag-knowledge
+        paths: [/v1/knowledge]
+        strip_path: false
+        tags: [r1, platform-route]
+        plugins:
+          - name: rate-limiting
+            config:
+              policy: redis
+              redis:
+                host: redis
+                port: 6379
+                database: 0
+              limit_by: header
+              header_name: X-Tenant-Id
+              minute: 2000  # Higher limit for RAG queries
+              fault_tolerant: true
+              hide_client_headers: false
+      
+      - name: knowledge-rag-documents
+        paths: [/v1/documents]
+        strip_path: false
+        tags: [r1, platform-route]
+        plugins:
+          - name: rate-limiting
+            config:
+              policy: redis
+              redis:
+                host: redis
+                port: 6379
+                database: 0
+              limit_by: header
+              header_name: X-Tenant-Id
+              minute: 2000
+              fault_tolerant: true
+              hide_client_headers: false
+      
+      - name: knowledge-rag-search
+        paths: [/v1/search]
+        strip_path: false
+        tags: [r1, platform-route]
+        plugins:
+          - name: rate-limiting
+            config:
+              policy: redis
+              redis:
+                host: redis
+                port: 6379
+                database: 0
+              limit_by: header
+              header_name: X-Tenant-Id
+              minute: 2000
+              fault_tolerant: true
+              hide_client_headers: false
+
+  # ==================== Integrations Service ====================
+  - name: integrations
+    url: http://integrations:8085
+    tags: [r1, platform-service]
+    routes:
+      - name: integrations-jira
+        paths: [/v1/jira]
+        strip_path: false
+        tags: [r1, platform-route]
+        plugins:
+          - name: rate-limiting
+            config:
+              policy: redis
+              redis:
+                host: redis
+                port: 6379
+                database: 0
+              limit_by: header
+              header_name: X-Tenant-Id
+              minute: 500
+              fault_tolerant: true
+              hide_client_headers: false
+      
+      - name: integrations-bitbucket
+        paths: [/v1/bitbucket]
+        strip_path: false
+        tags: [r1, platform-route]
+        plugins:
+          - name: rate-limiting
+            config:
+              policy: redis
+              redis:
+                host: redis
+                port: 6379
+                database: 0
+              limit_by: header
+              header_name: X-Tenant-Id
+              minute: 500
+              fault_tolerant: true
+              hide_client_headers: false
+      
+      - name: integrations-confluence
+        paths: [/v1/confluence]
+        strip_path: false
+        tags: [r1, platform-route]
+        plugins:
+          - name: rate-limiting
+            config:
+              policy: redis
+              redis:
+                host: redis
+                port: 6379
+                database: 0
+              limit_by: header
+              header_name: X-Tenant-Id
+              minute: 500
+              fault_tolerant: true
+              hide_client_headers: false
+      
+      - name: integrations-sharepoint
+        paths: [/v1/sharepoint]
+        strip_path: false
+        tags: [r1, platform-route]
+        plugins:
+          - name: rate-limiting
+            config:
+              policy: redis
+              redis:
+                host: redis
+                port: 6379
+                database: 0
+              limit_by: header
+              header_name: X-Tenant-Id
+              minute: 500
+              fault_tolerant: true
+              hide_client_headers: false
+
+  # ==================== LLMOps Platform Service ====================
+  - name: llmops
+    url: http://llmops:8081
+    tags: [r1, platform-service]
+    routes:
+      - name: llmops-experiments
+        paths: [/v1/experiments]
+        strip_path: false
+        tags: [r1, platform-route]
+        plugins:
+          - name: rate-limiting
+            config:
+              policy: redis
+              redis:
+                host: redis
+                port: 6379
+                database: 0
+              limit_by: header
+              header_name: X-Tenant-Id
+              minute: 1000
+              fault_tolerant: true
+              hide_client_headers: false
+      
+      - name: llmops-evaluations
+        paths: [/v1/evaluations]
+        strip_path: false
+        tags: [r1, platform-route]
+        plugins:
+          - name: rate-limiting
+            config:
+              policy: redis
+              redis:
+                host: redis
+                port: 6379
+                database: 0
+              limit_by: header
+              header_name: X-Tenant-Id
+              minute: 1000
+              fault_tolerant: true
+              hide_client_headers: false
+      
+      - name: llmops-prompts
+        paths: [/v1/prompts]
+        strip_path: false
+        tags: [r1, platform-route]
+        plugins:
+          - name: rate-limiting
+            config:
+              policy: redis
+              redis:
+                host: redis
+                port: 6379
+                database: 0
+              limit_by: header
+              header_name: X-Tenant-Id
+              minute: 1000
+              fault_tolerant: true
+              hide_client_headers: false
+

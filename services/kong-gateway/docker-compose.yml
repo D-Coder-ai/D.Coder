@@ -1,22 +1,6 @@
 version: '3.8'
 
 services:
-  postgres:
-    image: postgres:15-alpine
-    environment:
-      POSTGRES_USER: kong
-      POSTGRES_PASSWORD: kong
-      POSTGRES_DB: kong
-    ports:
-      - "5433:5432"
-    volumes:
-      - kong-postgres-data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U kong"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
   redis:
     image: redis:7-alpine
     ports:
@@ -29,35 +13,16 @@ services:
       timeout: 5s
       retries: 5
 
-  kong-migrations:
-    image: kong:latest
-    depends_on:
-      postgres:
-        condition: service_healthy
-    environment:
-      KONG_DATABASE: postgres
-      KONG_PG_HOST: postgres
-      KONG_PG_USER: kong
-      KONG_PG_PASSWORD: kong
-    command: kong migrations bootstrap
-    restart: on-failure
-
   kong:
     build:
       context: .
       dockerfile: Dockerfile
     depends_on:
-      postgres:
-        condition: service_healthy
       redis:
         condition: service_healthy
-      kong-migrations:
-        condition: service_completed_successfully
     environment:
-      KONG_DATABASE: postgres
-      KONG_PG_HOST: postgres
-      KONG_PG_USER: kong
-      KONG_PG_PASSWORD: kong
+      # DB-less mode for R1
+      KONG_DATABASE: "off"
       KONG_REDIS_HOST: redis
       KONG_REDIS_PORT: 6379
       KONG_PROXY_LISTEN: 0.0.0.0:8000, 0.0.0.0:8443 ssl
@@ -87,5 +52,4 @@ services:
       retries: 5
 
 volumes:
-  kong-postgres-data:
   kong-redis-data:

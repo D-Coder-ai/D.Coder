@@ -1,0 +1,97 @@
+_format_version: "3.0"
+
+# Health Check Routes for D.Coder R1
+# Provides global Kong health check and per-service health proxying
+
+services:
+  # ==================== Kong Gateway Health ====================
+  - name: kong-health
+    url: http://localhost:8100  # Kong status endpoint
+    tags: [r1, health, internal]
+    routes:
+      - name: gateway-health
+        paths: [/health]
+        strip_path: true
+        tags: [r1, health-route]
+        plugins:
+          # No rate limiting on health checks
+          - name: request-transformer
+            config:
+              replace:
+                uri: /status
+
+  # ==================== Platform API Health ====================
+  - name: platform-api-health
+    url: http://platform-api:8082
+    tags: [r1, health, platform-service]
+    routes:
+      - name: platform-api-health-check
+        paths: [/v1/platform-api/health]
+        strip_path: false
+        tags: [r1, health-route]
+        plugins:
+          - name: request-transformer
+            config:
+              replace:
+                uri: /health
+
+  # ==================== Agent Orchestrator Health ====================
+  - name: agent-orchestrator-health
+    url: http://agent-orchestrator:8083
+    tags: [r1, health, platform-service]
+    routes:
+      - name: agent-orchestrator-health-check
+        paths: [/v1/agent-orchestrator/health]
+        strip_path: false
+        tags: [r1, health-route]
+        plugins:
+          - name: request-transformer
+            config:
+              replace:
+                uri: /health
+
+  # ==================== Knowledge & RAG Health ====================
+  - name: knowledge-rag-health
+    url: http://knowledge-rag:8084
+    tags: [r1, health, platform-service]
+    routes:
+      - name: knowledge-rag-health-check
+        paths: [/v1/knowledge-rag/health]
+        strip_path: false
+        tags: [r1, health-route]
+        plugins:
+          - name: request-transformer
+            config:
+              replace:
+                uri: /health
+
+  # ==================== Integrations Health ====================
+  - name: integrations-health
+    url: http://integrations:8085
+    tags: [r1, health, platform-service]
+    routes:
+      - name: integrations-health-check
+        paths: [/v1/integrations/health]
+        strip_path: false
+        tags: [r1, health-route]
+        plugins:
+          - name: request-transformer
+            config:
+              replace:
+                uri: /health
+
+  # ==================== LLMOps Health ====================
+  - name: llmops-health
+    url: http://llmops:8081
+    tags: [r1, health, platform-service]
+    routes:
+      - name: llmops-health-check
+        paths: [/v1/llmops/health]
+        strip_path: false
+        tags: [r1, health-route]
+        plugins:
+          - name: request-transformer
+            config:
+              replace:
+                uri: /health
+
