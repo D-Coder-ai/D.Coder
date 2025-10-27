@@ -1,12 +1,9 @@
-"""
-LiteLLM Proxy Middleware
-Custom middleware for prompt compression and observability
-"""
+"""LiteLLM Proxy middleware package exports."""
 
 from .prompt_compression import PromptCompressionMiddleware
+from .quota_events import QuotaEventsMiddleware
 
-__all__ = ["PromptCompressionMiddleware"]
-
-# Initialize the middleware instance
-prompt_compression_middleware = PromptCompressionMiddleware()
-
+__all__ = [
+    "PromptCompressionMiddleware",
+    "QuotaEventsMiddleware",
+]

@@ -1,0 +1,1 @@
+Am not sure on this one, can you please check the R1 Architecture docuentation in C:\D.Coder-Droid\docs\project-docs and if you dont find answers use the exa mcp and perplexity mcp to get details on what the convention and best practice is and plan accordingly.
