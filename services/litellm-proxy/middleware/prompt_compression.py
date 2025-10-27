@@ -3,9 +3,9 @@ Prompt Compression Middleware using LLMLingua
 Integrates with LiteLLM's custom logger system to compress prompts before LLM calls
 """
 
+import os
 import time
 from typing import Optional, Literal, Dict, Any, List
-import litellm
 from litellm.integrations.custom_logger import CustomLogger
 
 # Try to import LLMLingua, but make it optional for development
@@ -40,25 +40,25 @@ class PromptCompressionMiddleware(CustomLogger):
             except Exception as e:
                 print(f"Failed to initialize LLMLingua compressor: {e}")
         
-        # Compression configuration per use case
+        # Compression configuration per use case (env-configurable)
         self.compression_config = {
             "default": {
                 "enabled": True,
-                "target_ratio": 0.5,  # 2x compression (50% of original)
-                "min_tokens": 500,     # Only compress if >500 tokens
-                "rate": 0.5
+                "target_ratio": float(os.getenv("COMPRESSION_DEFAULT_RATIO", "0.5")),
+                "min_tokens": int(os.getenv("COMPRESSION_DEFAULT_MIN_TOKENS", "500")),
+                "rate": float(os.getenv("COMPRESSION_DEFAULT_RATIO", "0.5"))
             },
             "rag_queries": {
                 "enabled": True,
-                "target_ratio": 0.33,  # 3x compression (33% of original)
-                "min_tokens": 1000,     # Only compress if >1000 tokens
-                "rate": 0.33
+                "target_ratio": float(os.getenv("COMPRESSION_RAG_RATIO", "0.33")),
+                "min_tokens": int(os.getenv("COMPRESSION_RAG_MIN_TOKENS", "1000")),
+                "rate": float(os.getenv("COMPRESSION_RAG_RATIO", "0.33"))
             },
             "chat": {
                 "enabled": True,
-                "target_ratio": 0.6,   # 1.67x compression (60% of original)
-                "min_tokens": 300,      # Only compress if >300 tokens
-                "rate": 0.6
+                "target_ratio": float(os.getenv("COMPRESSION_CHAT_RATIO", "0.6")),
+                "min_tokens": int(os.getenv("COMPRESSION_CHAT_MIN_TOKENS", "300")),
+                "rate": float(os.getenv("COMPRESSION_CHAT_RATIO", "0.6"))
             }
         }
     
@@ -103,10 +103,14 @@ class PromptCompressionMiddleware(CustomLogger):
         if not messages:
             return data
         
+        # Determine compression profile from metadata
+        metadata = data.get("metadata", {})
+        profile = self._select_compression_profile(metadata)
+        
         try:
             # Compress the prompt
             compression_start = time.time()
-            compressed_data = await self._compress_messages(messages, data)
+            compressed_data = await self._compress_messages(messages, data, profile)
             compression_time = time.time() - compression_start
             
             # Log compression metrics
@@ -115,7 +119,8 @@ class PromptCompressionMiddleware(CustomLogger):
                 original_tokens=compressed_data["original_tokens"],
                 compressed_tokens=compressed_data["compressed_tokens"],
                 savings_percent=compressed_data["savings_percent"],
-                compression_time=compression_time
+                compression_time=compression_time,
+                profile=profile
             )
             
             return compressed_data["data"]
@@ -125,13 +130,14 @@ class PromptCompressionMiddleware(CustomLogger):
             print(f"Compression failed for tenant {tenant_id}: {e}")
             return data
     
-    async def _compress_messages(self, messages: List[dict], data: dict) -> Dict[str, Any]:
+    async def _compress_messages(self, messages: List[dict], data: dict, profile: str = "default") -> Dict[str, Any]:
         """
         Compress message content while preserving structure.
         
         Args:
             messages: List of message dicts with role and content
             data: Full request data
+            profile: Compression profile to use ("default", "rag_queries", or "chat")
         
         Returns:
             Dict containing compressed data and metrics
@@ -159,8 +165,8 @@ class PromptCompressionMiddleware(CustomLogger):
         # Get token count estimate
         original_tokens = self._estimate_tokens(messages)
         
-        # Get compression config (default for now, can be made dynamic)
-        config = self.compression_config["default"]
+        # Get compression config for selected profile
+        config = self.compression_config.get(profile, self.compression_config["default"])
         
         # Only compress if above threshold
         if original_tokens < config["min_tokens"]:
@@ -239,6 +245,30 @@ class PromptCompressionMiddleware(CustomLogger):
             total += len(content) // 4
         return total
     
+    def _select_compression_profile(self, metadata: Dict[str, Any]) -> str:
+        """
+        Select compression profile based on request metadata.
+        
+        Args:
+            metadata: Request metadata dictionary
+        
+        Returns:
+            Profile name ("default", "rag_queries", or "chat")
+        """
+        # Check for RAG query flag in metadata
+        # LiteLLM passes metadata from request headers prefixed with x-
+        is_rag = metadata.get("x-rag") == "true" or metadata.get("rag") == "true"
+        if is_rag:
+            return "rag_queries"
+        
+        # Check for chat flag
+        is_chat = metadata.get("x-chat") == "true" or metadata.get("chat") == "true"
+        if is_chat:
+            return "chat"
+        
+        # Default profile
+        return "default"
+    
     def _check_compression_enabled(self, tenant_id: str) -> bool:
         """
         Check if compression is enabled for tenant.
@@ -260,7 +290,8 @@ class PromptCompressionMiddleware(CustomLogger):
         original_tokens: int,
         compressed_tokens: int,
         savings_percent: float,
-        compression_time: float
+        compression_time: float,
+        profile: str = "default"
     ):
         """
         Log compression metrics to Prometheus and console.
@@ -271,6 +302,7 @@ class PromptCompressionMiddleware(CustomLogger):
             compressed_tokens: Compressed prompt token count
             savings_percent: Percentage of tokens saved
             compression_time: Time taken to compress in seconds
+            profile: Compression profile used
         """
         try:
             # Import prometheus metrics
@@ -280,35 +312,35 @@ class PromptCompressionMiddleware(CustomLogger):
             compression_requests = Counter(
                 'litellm_compression_requests_total',
                 'Total number of compression requests',
-                ['tenant_id']
+                ['tenant_id', 'profile']
             )
             compression_savings = Histogram(
                 'litellm_compression_savings_percent',
                 'Compression savings percentage',
-                ['tenant_id']
+                ['tenant_id', 'profile']
             )
             compression_latency = Histogram(
                 'litellm_compression_latency_seconds',
                 'Compression operation latency',
-                ['tenant_id']
+                ['tenant_id', 'profile']
             )
             original_tokens_metric = Histogram(
                 'litellm_compression_original_tokens',
                 'Original token count before compression',
-                ['tenant_id']
+                ['tenant_id', 'profile']
             )
             compressed_tokens_metric = Histogram(
                 'litellm_compression_compressed_tokens',
                 'Token count after compression',
-                ['tenant_id']
+                ['tenant_id', 'profile']
             )
             
             # Record metrics
-            compression_requests.labels(tenant_id=tenant_id).inc()
-            compression_savings.labels(tenant_id=tenant_id).observe(savings_percent)
-            compression_latency.labels(tenant_id=tenant_id).observe(compression_time)
-            original_tokens_metric.labels(tenant_id=tenant_id).observe(original_tokens)
-            compressed_tokens_metric.labels(tenant_id=tenant_id).observe(compressed_tokens)
+            compression_requests.labels(tenant_id=tenant_id, profile=profile).inc()
+            compression_savings.labels(tenant_id=tenant_id, profile=profile).observe(savings_percent)
+            compression_latency.labels(tenant_id=tenant_id, profile=profile).observe(compression_time)
+            original_tokens_metric.labels(tenant_id=tenant_id, profile=profile).observe(original_tokens)
+            compressed_tokens_metric.labels(tenant_id=tenant_id, profile=profile).observe(compressed_tokens)
             
         except Exception as e:
             # Don't fail request if metrics logging fails
@@ -316,7 +348,7 @@ class PromptCompressionMiddleware(CustomLogger):
         
         # Also log to console for debugging
         print(
-            f"Compression for tenant {tenant_id}: "
+            f"Compression for tenant {tenant_id} [profile={profile}]: "
             f"{original_tokens} → {compressed_tokens} tokens "
             f"({savings_percent:.1f}% saved, {compression_time*1000:.1f}ms)"
         )
