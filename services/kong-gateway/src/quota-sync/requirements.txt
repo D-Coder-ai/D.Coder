@@ -1,0 +1,10 @@
+# Quota Sync Sidecar Dependencies
+
+# NATS client for JetStream
+nats-py==2.8.0
+
+# Async Redis client
+redis[hiredis]==5.0.1
+
+# Async support
+asyncio-nats-client==0.11.5

@@ -1,0 +1,110 @@
+# Rate Limiting Plugin Configuration
+# Redis-backed distributed rate limiting per tenant
+# Kong OSS plugin (not Advanced Rate Limiting - Enterprise only)
+
+plugins:
+  - name: rate-limiting
+    route: agent-workflows
+    config:
+      policy: redis
+      redis:
+        host: redis
+        port: 6379
+        database: 0
+        timeout: 2000
+        keepalive_pool_size: 30
+        keepalive_backlog: 100
+      limit_by: header
+      header_name: X-Tenant-Id
+      minute: 100
+      hour: 5000
+      day: 100000
+      fault_tolerant: true
+      hide_client_headers: false
+      redis_ssl: false
+      redis_ssl_verify: false
+
+  - name: rate-limiting
+    route: agent-orchestrator-api
+    config:
+      policy: redis
+      redis:
+        host: redis
+        port: 6379
+        database: 0
+        timeout: 2000
+      limit_by: header
+      header_name: X-Tenant-Id
+      minute: 100
+      hour: 5000
+      day: 100000
+      fault_tolerant: true
+      hide_client_headers: false
+
+  - name: rate-limiting
+    route: knowledge-search
+    config:
+      policy: redis
+      redis:
+        host: redis
+        port: 6379
+        database: 0
+        timeout: 2000
+      limit_by: header
+      header_name: X-Tenant-Id
+      minute: 50  # Lower limit for expensive search operations
+      hour: 2500
+      day: 50000
+      fault_tolerant: true
+      hide_client_headers: false
+
+  - name: rate-limiting
+    route: rag-pipeline
+    config:
+      policy: redis
+      redis:
+        host: redis
+        port: 6379
+        database: 0
+        timeout: 2000
+      limit_by: header
+      header_name: X-Tenant-Id
+      minute: 50  # Lower limit for expensive RAG operations
+      hour: 2500
+      day: 50000
+      fault_tolerant: true
+      hide_client_headers: false
+
+  - name: rate-limiting
+    route: integrations-api
+    config:
+      policy: redis
+      redis:
+        host: redis
+        port: 6379
+        database: 0
+        timeout: 2000
+      limit_by: header
+      header_name: X-Tenant-Id
+      minute: 100
+      hour: 5000
+      day: 100000
+      fault_tolerant: true
+      hide_client_headers: false
+
+  - name: rate-limiting
+    route: llmops-experiments
+    config:
+      policy: redis
+      redis:
+        host: redis
+        port: 6379
+        database: 0
+        timeout: 2000
+      limit_by: header
+      header_name: X-Tenant-Id
+      minute: 100
+      hour: 5000
+      day: 100000
+      fault_tolerant: true
+      hide_client_headers: false

@@ -86,6 +86,32 @@ services:
       timeout: 10s
       retries: 5
 
+  quota-sync:
+    build:
+      context: ./src/quota-sync
+      dockerfile: Dockerfile
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      NATS_URL: ${NATS_URL:-nats://nats:4222}
+      NATS_STREAM: ${NATS_STREAM:-QUOTAS}
+      NATS_SUBJECT: ${NATS_SUBJECT:-quota.updated}
+      NATS_CONSUMER: ${NATS_CONSUMER:-quota-sync-kong}
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_DB: ${REDIS_DB:-0}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      REDIS_KEY_PREFIX: ${REDIS_KEY_PREFIX:-quota:tenant:}
+    restart: unless-stopped
+    networks:
+      - default
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys; sys.exit(0)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
 volumes:
   kong-postgres-data:
   kong-redis-data:

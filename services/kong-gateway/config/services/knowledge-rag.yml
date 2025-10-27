@@ -1,0 +1,15 @@
+# Knowledge & RAG Service Definition
+# Platform service for document processing and semantic search
+# Internal service: http://knowledge-rag:8084
+
+- name: knowledge-rag
+  url: http://knowledge-rag:8084
+  protocol: http
+  connect_timeout: 60000
+  write_timeout: 120000  # RAG operations may take longer
+  read_timeout: 120000
+  retries: 3
+  tags:
+    - r1
+    - platform-service
+    - knowledge-rag

@@ -1,0 +1,32 @@
+# Request Transformer Plugin Configuration
+# Adds required R1 service contract headers to upstream requests
+# Kong OSS plugin
+
+plugins:
+  # Global request transformer for all platform services
+  - name: request-transformer
+    config:
+      add:
+        headers:
+          # Preserve X-Request-Id from correlation-id plugin
+          - "X-Request-Id:$(headers.x-request-id)"
+          # Add X-Trace-Id for distributed tracing
+          - "X-Trace-Id:$(headers.x-request-id)"
+          # Propagate tenant context
+          - "X-Tenant-Id:$(headers.x-tenant-id)"
+          - "X-Platform-Id:$(headers.x-platform-id)"
+          - "X-User-Id:$(headers.x-user-id)"
+          # Add Kong gateway identifier
+          - "X-Gateway:kong"
+          - "X-Gateway-Version:3.0"
+      remove:
+        headers:
+          # Remove sensitive headers before forwarding
+          - Authorization  # Will be re-added by service-specific auth
+          - Cookie
+      replace:
+        headers: []
+      rename:
+        headers: []
+      append:
+        headers: []

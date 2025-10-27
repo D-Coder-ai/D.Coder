@@ -1,0 +1,59 @@
+# Agent Orchestrator Routes
+# Routes for workflow execution and agent orchestration APIs
+# All routes follow R1 service contracts: /v1 base path, required headers
+
+routes:
+  - name: agent-workflows
+    service: agent-orchestrator
+    paths:
+      - /v1/workflows
+    methods:
+      - GET
+      - POST
+      - PUT
+      - DELETE
+    strip_path: false
+    preserve_host: false
+    protocols:
+      - http
+      - https
+    tags:
+      - r1
+      - agent-route
+      - workflows
+
+  - name: agent-orchestrator-api
+    service: agent-orchestrator
+    paths:
+      - /v1/agents
+    methods:
+      - GET
+      - POST
+      - PUT
+      - DELETE
+    strip_path: false
+    preserve_host: false
+    protocols:
+      - http
+      - https
+    tags:
+      - r1
+      - agent-route
+      - agents
+
+  - name: agent-executions
+    service: agent-orchestrator
+    paths:
+      - /v1/executions
+    methods:
+      - GET
+      - POST
+    strip_path: false
+    preserve_host: false
+    protocols:
+      - http
+      - https
+    tags:
+      - r1
+      - agent-route
+      - executions

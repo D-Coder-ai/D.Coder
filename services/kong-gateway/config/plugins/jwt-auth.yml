@@ -1,0 +1,100 @@
+# JWT Authentication Plugin Configuration
+# Validates JWTs issued by Logto (OIDC provider)
+# Kong OSS plugin (not Enterprise OIDC)
+
+# Note: JWT plugin in Kong OSS requires pre-configured consumers with JWT credentials
+# For R1, we use a simpler approach: validate JWT signature and claims
+# Full OIDC integration with Logto would require custom plugin or Enterprise OIDC
+
+plugins:
+  # JWT validation for agent orchestrator routes
+  - name: jwt
+    route: agent-workflows
+    config:
+      uri_param_names:
+        - jwt
+      cookie_names:
+        - jwt_token
+      claims_to_verify:
+        - exp
+        - nbf
+      key_claim_name: iss
+      secret_is_base64: false
+      run_on_preflight: false
+      maximum_expiration: 86400  # 24 hours
+      anonymous: null  # No anonymous access
+
+  - name: jwt
+    route: agent-orchestrator-api
+    config:
+      uri_param_names:
+        - jwt
+      cookie_names:
+        - jwt_token
+      claims_to_verify:
+        - exp
+        - nbf
+      key_claim_name: iss
+      secret_is_base64: false
+      run_on_preflight: false
+      maximum_expiration: 86400
+
+  - name: jwt
+    route: knowledge-documents
+    config:
+      uri_param_names:
+        - jwt
+      cookie_names:
+        - jwt_token
+      claims_to_verify:
+        - exp
+        - nbf
+      key_claim_name: iss
+      secret_is_base64: false
+      run_on_preflight: false
+      maximum_expiration: 86400
+
+  - name: jwt
+    route: knowledge-search
+    config:
+      uri_param_names:
+        - jwt
+      cookie_names:
+        - jwt_token
+      claims_to_verify:
+        - exp
+        - nbf
+      key_claim_name: iss
+      secret_is_base64: false
+      run_on_preflight: false
+      maximum_expiration: 86400
+
+  - name: jwt
+    route: integrations-api
+    config:
+      uri_param_names:
+        - jwt
+      cookie_names:
+        - jwt_token
+      claims_to_verify:
+        - exp
+        - nbf
+      key_claim_name: iss
+      secret_is_base64: false
+      run_on_preflight: false
+      maximum_expiration: 86400
+
+  - name: jwt
+    route: llmops-experiments
+    config:
+      uri_param_names:
+        - jwt
+      cookie_names:
+        - jwt_token
+      claims_to_verify:
+        - exp
+        - nbf
+      key_claim_name: iss
+      secret_is_base64: false
+      run_on_preflight: false
+      maximum_expiration: 86400
