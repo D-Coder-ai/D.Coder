@@ -1,1 +1,0 @@
-Add only the changes done by you the current chat and commit them using the Conventional Commit Messages specification and push them to remote. If you get an error for user.name and user.email, you can set these config parameters only for that repo (not globally) as "Manan Ramnani" and "ramnani.manan@gmail.com" respectively.

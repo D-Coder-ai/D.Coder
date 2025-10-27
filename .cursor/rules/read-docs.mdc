@@ -1,4 +1,0 @@
----
-alwaysApply: true
----
-Currently our only focus is Release 1 or R1 and when in a new chat session, always first read all the docs in docs\project-docs\releases\R1 , then check the completed tasks in taskmaster, and also do a quick scan of the codebase, to get a proper idea of the existing code arrangement (if any) and then proceed with your planning or development. But this is required only once when you are in a new chat so that you get the relevant context and should be avoided if you have already completed these tasks. 
