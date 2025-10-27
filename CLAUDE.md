@@ -160,8 +160,100 @@ pnpm version-packages       # Update versions from changesets
 3. **Make changes** - hot-reload enabled via volume mounts
 4. **Test:** `pnpm nx test platform-api`
 5. **Lint:** `pnpm nx lint platform-api`
-6. **Create changeset** (if user-facing): `pnpm changeset`
-7. **Commit** using Conventional Commits format
+6. **Update VALIDATION.md:** Document setup, validation steps, and tests for your component
+7. **Create changeset** (if user-facing): `pnpm changeset`
+8. **Commit** using Conventional Commits format
+
+## Validation Documentation (VALIDATION.md)
+
+**IMPORTANT:** Whenever you complete development or make updates to any component, you MUST update `VALIDATION.md` with:
+
+### Required Information
+
+1. **Setup Instructions**
+   - Prerequisites specific to the component
+   - Step-by-step setup commands
+   - Environment variables needed
+   - Dependencies on other services
+
+2. **Validation Steps**
+   - Health checks to verify the service is running
+   - Configuration verification commands
+   - Network connectivity tests
+   - Expected outputs for each validation
+
+3. **Integration Tests**
+   - How to run integration tests
+   - What each test validates
+   - Expected results and common failure modes
+
+4. **Troubleshooting**
+   - Common issues you encountered during development
+   - How to diagnose problems (log locations, debug commands)
+   - Solutions that worked for you
+
+5. **Performance Benchmarks** (if applicable)
+   - Expected latency/throughput numbers
+   - Resource usage baselines
+   - Load testing procedures
+
+### Guidelines
+
+- **Be specific:** Include actual commands that can be copy-pasted
+- **Provide examples:** Show expected outputs for validation steps
+- **Test your instructions:** Verify on a clean environment before committing
+- **Keep it concise:** Focus on practical validation, not theory
+- **Update regularly:** VALIDATION.md is a living document
+
+### Example Entry Structure
+
+```markdown
+## [Your Component Name]
+
+### Components
+- List of sub-components and their ports
+
+### Setup
+```bash
+# Actual setup commands
+```
+
+### Validation Steps
+
+#### 1. Verify [Component] Status
+```bash
+# Command to check status
+curl http://localhost:8000/health
+
+# Expected output:
+# {"status": "healthy"}
+```
+
+#### 2. Test [Specific Feature]
+```bash
+# Test command
+# Expected result
+```
+
+### Integration Tests
+```bash
+# How to run tests
+# What they validate
+```
+
+### Troubleshooting
+**Issue:** Description of common problem
+```bash
+# Diagnostic commands
+# Solution
+```
+```
+
+By maintaining comprehensive validation documentation, we ensure:
+- New team members can validate their setup quickly
+- CI/CD pipelines can be built from tested commands
+- Troubleshooting is faster with documented solutions
+- Each component has clear acceptance criteria
 
 ## Commit Message Format
 
