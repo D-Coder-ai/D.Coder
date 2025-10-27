@@ -2,14 +2,15 @@
 # Platform service for external tool integrations (JIRA, Bitbucket, etc.)
 # Internal service: http://integrations:8085
 
-- name: integrations
-  url: http://integrations:8085
-  protocol: http
-  connect_timeout: 60000
-  write_timeout: 90000  # External API calls may take time
-  read_timeout: 90000
-  retries: 3
-  tags:
-    - r1
-    - platform-service
-    - integrations
+services:
+  - name: integrations
+    url: http://integrations:8085
+    protocol: http
+    connect_timeout: 60000
+    write_timeout: 90000  # External API calls may take time
+    read_timeout: 90000
+    retries: 3
+    tags:
+      - r1
+      - platform-service
+      - integrations

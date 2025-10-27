@@ -2,14 +2,15 @@
 # Platform service for durable workflow execution and agent orchestration
 # Internal service: http://agent-orchestrator:8083
 
-- name: agent-orchestrator
-  url: http://agent-orchestrator:8083
-  protocol: http
-  connect_timeout: 60000
-  write_timeout: 60000
-  read_timeout: 60000
-  retries: 3
-  tags:
-    - r1
-    - platform-service
-    - agent-orchestrator
+services:
+  - name: agent-orchestrator
+    url: http://agent-orchestrator:8083
+    protocol: http
+    connect_timeout: 60000
+    write_timeout: 60000
+    read_timeout: 60000
+    retries: 3
+    tags:
+      - r1
+      - platform-service
+      - agent-orchestrator

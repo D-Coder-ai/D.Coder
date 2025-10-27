@@ -2,14 +2,15 @@
 # Platform service for prompt engineering and experimentation (Agenta)
 # Internal service: http://llmops:8081
 
-- name: llmops
-  url: http://llmops:8081
-  protocol: http
-  connect_timeout: 60000
-  write_timeout: 60000
-  read_timeout: 60000
-  retries: 3
-  tags:
-    - r1
-    - platform-service
-    - llmops
+services:
+  - name: llmops
+    url: http://llmops:8081
+    protocol: http
+    connect_timeout: 60000
+    write_timeout: 60000
+    read_timeout: 60000
+    retries: 3
+    tags:
+      - r1
+      - platform-service
+      - llmops

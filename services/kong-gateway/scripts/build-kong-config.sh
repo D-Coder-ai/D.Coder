@@ -34,8 +34,11 @@ echo "services:" >> "$TEMP_FILE"
 for service_file in "$CONFIG_DIR/services"/*.yml; do
   if [ -f "$service_file" ]; then
     echo "  - Adding service from $(basename "$service_file")"
-    # Remove the leading dash and indent properly
-    sed 's/^- /  - /' "$service_file" >> "$TEMP_FILE"
+    # Extract services array content (files now have proper 'services:' wrapper)
+    sed -n '/^services:/,$ {
+      /^services:/d
+      p
+    }' "$service_file" >> "$TEMP_FILE"
   fi
 done
 
@@ -59,15 +62,17 @@ if grep -q "^routes:" "$CONFIG_DIR/routes"/*.yml 2>/dev/null; then
   echo "" >> "$TEMP_FILE"
 fi
 
+# Add plugins section (consolidated)
+echo "Adding plugins..."
+echo "plugins:" >> "$TEMP_FILE"
+
 # Add global plugins
-echo "Adding global plugins..."
 if [ -f "$CONFIG_DIR/plugins/global-plugins.yml" ]; then
-  echo "plugins:" >> "$TEMP_FILE"
+  echo "  - Adding global plugins"
   sed -n '/^plugins:/,$ {
     /^plugins:/d
     p
   }' "$CONFIG_DIR/plugins/global-plugins.yml" >> "$TEMP_FILE"
-  echo "" >> "$TEMP_FILE"
 fi
 
 # Add route-specific plugins (rate limiting, JWT, request transformer)
@@ -77,7 +82,7 @@ for plugin_file in "$CONFIG_DIR/plugins/rate-limiting.yml" \
                     "$CONFIG_DIR/plugins/request-transform.yml"; do
   if [ -f "$plugin_file" ]; then
     echo "  - Adding plugins from $(basename "$plugin_file")"
-    # Extract plugins array and append
+    # Extract plugins array content and append (skip the 'plugins:' line)
     sed -n '/^plugins:/,$ {
       /^plugins:/d
       p
@@ -85,12 +90,9 @@ for plugin_file in "$CONFIG_DIR/plugins/rate-limiting.yml" \
   fi
 done
 
-# Add custom plugins section
-echo "" >> "$TEMP_FILE"
-echo "# Custom Plugins" >> "$TEMP_FILE"
-echo "# quota-mirror plugin configuration" >> "$TEMP_FILE"
+# Add custom quota-mirror plugin
+echo "  - Adding quota-mirror plugin"
 cat >> "$TEMP_FILE" <<EOF
-plugins:
   - name: quota-mirror
     enabled: true
     config:
@@ -103,6 +105,8 @@ plugins:
       block_on_quota_exceeded: false
       log_quota_checks: true
 EOF
+
+echo "" >> "$TEMP_FILE"
 
 # Validate YAML syntax (if yq is available)
 if command -v yq &> /dev/null; then

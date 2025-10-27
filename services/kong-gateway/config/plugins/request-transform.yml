@@ -21,8 +21,7 @@ plugins:
           - "X-Gateway-Version:3.0"
       remove:
         headers:
-          # Remove sensitive headers before forwarding
-          - Authorization  # Will be re-added by service-specific auth
+          # Remove sensitive cookies only - keep Authorization for backend services
           - Cookie
       replace:
         headers: []
