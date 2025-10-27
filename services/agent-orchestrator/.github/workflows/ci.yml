@@ -1,0 +1,81 @@
+name: Agent Orchestrator CI
+
+on:
+  pull_request:
+    paths:
+      - 'services/agent-orchestrator/**'
+  push:
+    branches:
+      - main
+    paths:
+      - 'services/agent-orchestrator/**'
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/agent-orchestrator
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          pip install ruff mypy
+          pip install -r requirements.txt
+      
+      - name: Run ruff
+        run: ruff check src/ tests/
+      
+      - name: Run mypy
+        run: mypy src/ --ignore-missing-imports
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/agent-orchestrator
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      
+      - name: Run unit tests
+        run: pytest tests/unit -v --cov=src --cov-report=xml
+      
+      - name: Run integration tests
+        run: pytest tests/integration -v
+      
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.xml
+          flags: unittests
+
+  build:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+    needs: [lint, test]
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Build Docker image
+        run: |
+          cd services/agent-orchestrator
+          docker build -t dcoder/agent-orchestrator:${{ github.sha }} .

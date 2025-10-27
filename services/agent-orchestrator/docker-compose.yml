@@ -1,13 +1,40 @@
 version: '3.8'
 
+networks:
+  default:
+    external:
+      name: dcoder-network
+
 services:
   agent-orchestrator:
     build: .
+    container_name: dcoder-agent-orchestrator
     ports:
       - "8083:8083"
     environment:
+      PORT: 8083
       SERVICE_NAME: agent-orchestrator
-      SERVICE_PORT: 8083
+      ENVIRONMENT: development
       DEBUG: "true"
+      LOG_LEVEL: INFO
+      TEMPORAL_HOST: temporal:7233
+      TEMPORAL_NAMESPACE: default
+      NATS_URL: nats://nats:4222
+      KONG_BASE_URL: http://kong:8000
+      PLATFORM_API_BASE: http://kong:8000/platform/v1
+      LITELLM_BASE: http://litellm-proxy:4000
+      REDIS_URL: redis://redis:6379/1
+      PROMETHEUS_PORT: 9091
+      ENABLE_METRICS: "true"
+      ENABLE_TRACING: "true"
     volumes:
       - ./src:/app/src
+    depends_on:
+      - temporal
+      - nats
+      - redis
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8083/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
