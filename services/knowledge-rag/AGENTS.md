@@ -64,3 +64,7 @@ _Status: Ready for ingestion and retrieval implementation aligned with R1 scope.
 ## Tooling Notes
 - Ensure docker-compose dependencies (PostgreSQL, MinIO, Redis) are running.
 - Validate pgvector extension is enabled and migrations cover required schemas.
+
+## Planning Notes
+- When working on a plan or in planning mode you should ask the user any number of questions you like, and give them clear choices (upto 5) with a proper indication of which choice aligns with the architecture documentation
+- Also when you receive a response from the user, ensure that you document that choice in a document DECISIONS.md in the parent platform at "C:\D.Coder-Droid\docs\project-docs\releases\R1\Decision.md" . Give a short super concise detail about the choice we made for what question

@@ -62,3 +62,7 @@ _Status: R1 LLM gateway workstream — caching, compression, and quota events._
 ## Tooling Notes
 - Use docker-compose to run Redis/PostgreSQL dependencies.
 - Monitor Prometheus metrics and Langfuse traces whenever features are added.
+
+## Planning Notes
+- When working on a plan or in planning mode you should ask the user any number of questions you like, and give them clear choices (upto 5) with a proper indication of which choice aligns with the architecture documentation
+- Also when you receive a response from the user, ensure that you document that choice in a document DECISIONS.md in the parent platform at "C:\D.Coder-Droid\docs\project-docs\releases\R1\Decision.md" . Give a short super concise detail about the choice we made for what question

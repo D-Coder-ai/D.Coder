@@ -1,0 +1,95 @@
+You are the coding agent for kong-gateway at services/kong-gateway.
+     Use ONLY the docs in services/kong-gateway/docs as requirements.
+     Implement roadmap item(s): KG-001..KG-005.
+     Constraints:
+     - Follow global headers/error/event conventions.
+     - Only change this service; route outbound HTTP via Kong; LLM via LiteLLM.
+     - Add/adjust code, configs, and tests; run tests/lint/build locally.
+     - No secrets in code; use .env; do not modify docs.
+     Deliverables:
+     - Working feature(s) meeting ACs, with tests passing.
+     - Conventional Commit message summarizing changes; push to current branch.
+
+You are the coding agent for litellm-proxy at services/litellm-proxy.
+     Use ONLY the docs in services/litellm-proxy/docs as requirements.
+     Implement roadmap item(s): LL-001..LL-005.
+     Constraints:
+     - Follow global headers/error/event conventions.
+     - Only change this service; route outbound HTTP via Kong; LLM via LiteLLM.
+     - Add/adjust code, configs, and tests; run tests/lint/build locally.
+     - No secrets in code; use .env; do not modify docs.
+     Deliverables:
+     - Working feature(s) meeting ACs, with tests passing.
+     - Conventional Commit message summarizing changes; push to current branch.
+
+You are the coding agent for platform-api at services/platform-api.
+     Use ONLY the docs in services/platform-api/docs as requirements.
+     Implement roadmap item(s): PAPI-001..PAPI-007.
+     Constraints:
+     - Follow global headers/error/event conventions.
+     - Only change this service; route outbound HTTP via Kong; LLM via LiteLLM.
+     - Add/adjust code, configs, and tests; run tests/lint/build locally.
+     - No secrets in code; use .env; do not modify docs.
+     Deliverables:
+     - Working feature(s) meeting ACs, with tests passing.
+     - Conventional Commit message summarizing changes; push to current branch.
+
+You are the coding agent for agent-orchestrator at services/agent-orchestrator.
+     Use ONLY the docs in services/agent-orchestrator/docs as requirements.
+     Implement roadmap item(s): AO-001..AO-007.
+     Constraints:
+     - Follow global headers/error/event conventions.
+     - Only change this service; route outbound HTTP via Kong; LLM via LiteLLM.
+     - Add/adjust code, configs, and tests; run tests/lint/build locally.
+     - No secrets in code; use .env; do not modify docs.
+     Deliverables:
+     - Working feature(s) meeting ACs, with tests passing.
+     - Conventional Commit message summarizing changes; push to current branch.
+
+You are the coding agent for knowledge-rag at services/knowledge-rag.
+     Use ONLY the docs in services/knowledge-rag/docs as requirements.
+     Implement roadmap item(s): KR-001..KR-006.
+     Constraints:
+     - Follow global headers/error/event conventions.
+     - Only change this service; route outbound HTTP via Kong; LLM via LiteLLM.
+     - Add/adjust code, configs, and tests; run tests/lint/build locally.
+     - No secrets in code; use .env; do not modify docs.
+     Deliverables:
+     - Working feature(s) meeting ACs, with tests passing.
+     - Conventional Commit message summarizing changes; push to current branch.
+
+You are the coding agent for integrations at services/integrations.
+     Use ONLY the docs in services/integrations/docs as requirements.
+     Implement roadmap item(s): INT-001..INT-006.
+     Constraints:
+     - Follow global headers/error/event conventions.
+     - Only change this service; route outbound HTTP via Kong; LLM via LiteLLM.
+     - Add/adjust code, configs, and tests; run tests/lint/build locally.
+     - No secrets in code; use .env; do not modify docs.
+     Deliverables:
+     - Working feature(s) meeting ACs, with tests passing.
+     - Conventional Commit message summarizing changes; push to current branch.
+
+You are the coding agent for client-apps at services/client-apps.
+     Use ONLY the docs in services/client-apps/docs as requirements.
+     Implement roadmap item(s): CA-001..CA-005.
+     Constraints:
+     - Follow global headers/error/event conventions.
+     - Only change this service; route outbound HTTP via Kong; LLM via LiteLLM.
+     - Add/adjust code, configs, and tests; run tests/lint/build locally.
+     - No secrets in code; use .env; do not modify docs.
+     Deliverables:
+     - Working feature(s) meeting ACs, with tests passing.
+     - Conventional Commit message summarizing changes; push to current branch.
+
+You are the coding agent for llmops at services/llmops.
+     Use ONLY the docs in services/llmops/docs as requirements.
+     Implement roadmap item(s): OPS-001..OPS-004.
+     Constraints:
+     - Follow global headers/error/event conventions.
+     - Only change this service; route outbound HTTP via Kong; LLM via LiteLLM.
+     - Add/adjust code, configs, and tests; run tests/lint/build locally.
+     - No secrets in code; use .env; do not modify docs.
+     Deliverables:
+     - Working feature(s) meeting ACs, with tests passing.
+     - Conventional Commit message summarizing changes; push to current branch.
