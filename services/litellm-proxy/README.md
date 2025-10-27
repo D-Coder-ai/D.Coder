@@ -5,7 +5,7 @@ LiteLLM Proxy service providing specialized LLM gateway capabilities including:
 - **Multi-LLM Routing**: Native support for OpenAI, Anthropic, Google Gemini, and Groq
 - **Redis-Backed Semantic Caching**: 40-60% token reduction through intelligent caching
 - **Prompt Compression**: 20-30% additional savings using LLMLingua
-- **Cost-Based Routing**: Automatic routing to cheapest available model
+- **Simple-Shuffle Routing**: Round-robin routing (cost-based routing deferred to R2)
 - **Virtual Keys**: Multi-tenancy without per-tenant database overhead
 - **Observability**: Native Langfuse and Prometheus integration
 
@@ -92,23 +92,74 @@ curl http://localhost:4000/v1/chat/completions \
 
 ### 1. Semantic Caching
 
-Automatic Redis-backed caching with 1-hour TTL:
+**Redis-backed semantic caching** using embedding similarity matching with 1-hour TTL:
 
 ```yaml
 # config/litellm_config.yaml
 litellm_settings:
   cache: true
   cache_params:
-    type: redis
-    ttl: 3600
+    type: redis-semantic  # Embedding-based similarity matching
+    host: redis
+    port: 6379
+    ttl: 3600  # 1 hour cache TTL
     namespace: "litellm:cache"
+    similarity_threshold: 0.8  # 80% similarity required for cache hit
+    redis_semantic_cache_embedding_model: "text-embedding-ada-002"
+    supported_call_types: ["acompletion", "atext_completion", "aembedding"]
+    max_connections: 100
+```
+
+**How It Works:**
+1. **First Request (Cache MISS)**:
+   - User prompt is converted to embedding using `text-embedding-ada-002`
+   - Embedding stored in Redis with response
+   - Full LLM API call made
+
+2. **Subsequent Request (Cache HIT)**:
+   - New prompt is converted to embedding
+   - Cosine similarity calculated against cached embeddings
+   - If similarity ≥ 0.8 (80%), cached response returned
+   - No LLM API call needed
+
+**Example:**
+```bash
+# First request - exact match
+"What is the capital of France?" → MISS → API call → "Paris" (cached)
+
+# Second request - exact match
+"What is the capital of France?" → HIT → "Paris" (from cache, <50ms)
+
+# Third request - semantic match
+"What is the capital city of France?" → HIT → "Paris" (81% similarity, cached)
+
+# Fourth request - no match
+"What is the population of Paris?" → MISS → API call (59% similarity, below threshold)
 ```
 
 **Benefits:**
-- 40-60% token reduction
-- <50ms cache hit latency
-- Automatic cache key generation
-- Tenant isolation via namespace
+- **40-60% token reduction** through intelligent caching
+- **<50ms cache hit latency** (vs 500-3000ms for API calls)
+- **Automatic cache key generation** based on embeddings
+- **Tenant isolation** via namespace prefix
+- **Semantic understanding** - similar questions hit cache even with different wording
+
+**Configuration Tuning:**
+- **similarity_threshold: 0.8** (default) - Higher = stricter matching, lower cache hit rate
+- **similarity_threshold: 0.9** - Very strict, only nearly identical prompts hit cache
+- **similarity_threshold: 0.7** - More lenient, higher cache hit rate but less precise
+
+**Monitoring:**
+```bash
+# Check cache hit/miss ratio in Prometheus
+curl http://localhost:4000/metrics | grep litellm_cache
+
+# View cached embeddings in Redis
+docker exec dcoder-redis redis-cli KEYS "litellm:cache:*"
+
+# Check cache size
+docker exec dcoder-redis redis-cli INFO memory | grep used_memory_human
+```
 
 ### 2. Prompt Compression
 
@@ -130,31 +181,129 @@ Available via Prometheus metrics:
 - `litellm_compression_savings_percent`
 - `litellm_compression_latency_seconds`
 
-### 3. Cost-Based Routing
+### 3. Routing Strategy
 
-Automatic routing to cheapest model:
+**R1 Configuration (Current):**
+
+LiteLLM uses simple round-robin routing with **NO automatic provider failover** to comply with R1 constraints.
 
 ```yaml
 router_settings:
-  routing_strategy: cost-based-routing
-  fallbacks:
-    - gpt-4o: ["claude-sonnet-4-5", "gemini-2-5-pro"]
+  routing_strategy: simple-shuffle  # Round-robin across available providers
+  num_retries: 3  # Retry on same model/provider only
+  timeout: 120
+  # NO fallbacks configured - R1 constraint
+```
+
+**Why No Automatic Failover in R1?**
+
+Per R1 architecture requirements, automatic provider failover is disabled to:
+- Maintain predictable cost control
+- Ensure explicit model selection by applications
+- Simplify debugging and observability
+- Allow manual intervention on provider failures
+
+**R2+ Feature (Not Available in R1):**
+
+Cost-based routing and automatic failover will be enabled in R2. This is currently disabled per R1 architecture requirements.
+
+```yaml
+# R2+ Configuration (Not supported in R1):
+# router_settings:
+#   routing_strategy: cost-based-routing
+#   fallbacks:
+#     - gpt-4o: ["claude-sonnet-4-5", "gemini-2-5-pro"]
+#     - claude-sonnet-4-5: ["gpt-4o", "gemini-2-5-pro"]
 ```
 
 ### 4. Virtual Keys (Multi-Tenancy)
 
-Generate per-tenant API keys:
+**Database-backed virtual keys** for multi-tenant isolation without per-tenant database overhead:
+
+**Generate per-tenant API keys:**
 
 ```bash
 curl http://localhost:4000/key/generate \
   -H "Authorization: Bearer $LITELLM_MASTER_KEY" \
+  -H "Content-Type: application/json" \
   -d '{
-    "user_id": "user123",
-    "team_id": "tenant123",
+    "user_id": "user-001",
+    "team_id": "tenant-001",
     "max_budget": 100.0,
-    "models": ["gpt-4o", "claude-sonnet-4-5"]
+    "models": ["gpt-4o-mini", "claude-haiku-3-5"],
+    "duration": "30d",
+    "rpm": 1000,
+    "tpm": 100000,
+    "aliases": {"gpt-4o-mini": "fast-model"}
+  }'
+
+# Response:
+# {
+#   "key": "sk-...",
+#   "expires": "2025-11-28T00:00:00Z",
+#   "user_id": "user-001",
+#   "team_id": "tenant-001",
+#   "max_budget": 100.0
+# }
+```
+
+**Use virtual key for requests:**
+
+```bash
+# Use the generated virtual key (not master key)
+curl http://localhost:4000/v1/chat/completions \
+  -H "Authorization: Bearer sk-..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "fast-model",  # Uses alias
+    "messages": [{"role": "user", "content": "Hello"}]
   }'
 ```
+
+**Key Features:**
+- **Budget enforcement** - Requests blocked when max_budget exceeded
+- **Rate limiting** - Per-key RPM (requests per minute) and TPM (tokens per minute)
+- **Model access control** - Restrict which models can be used
+- **Model aliases** - Simplify model names for clients
+- **Usage tracking** - All spend logged to PostgreSQL
+- **Expiration** - Keys auto-expire after duration
+
+**Check key usage:**
+
+```bash
+curl http://localhost:4000/key/info \
+  -H "Authorization: Bearer $LITELLM_MASTER_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"key": "sk-..."}'
+
+# Response:
+# {
+#   "key": "sk-...",
+#   "user_id": "user-001",
+#   "team_id": "tenant-001",
+#   "spend": 2.45,
+#   "max_budget": 100.0,
+#   "budget_remaining": 97.55,
+#   "models": ["gpt-4o-mini", "claude-haiku-3-5"],
+#   "expires": "2025-11-28T00:00:00Z"
+# }
+```
+
+**Delete key:**
+
+```bash
+curl -X POST http://localhost:4000/key/delete \
+  -H "Authorization: Bearer $LITELLM_MASTER_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"key": "sk-..."}'
+```
+
+**R1 Multi-Tenancy Strategy:**
+- Each tenant gets a virtual key with their own provider credentials (BYO LLM)
+- Budget limits per tenant enforced at LiteLLM level
+- Usage tracked in PostgreSQL for billing/reporting
+- Semantic cache is namespace-isolated per tenant
+- Platform API creates/manages virtual keys on tenant onboarding
 
 ## Monitoring
 

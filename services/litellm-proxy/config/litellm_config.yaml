@@ -90,32 +90,28 @@ model_list:
       rpm: 30
       tpm: 20000
 
-# Router Settings - Load Balancing and Failover
+# Router Settings - Load Balancing (No Automatic Failover per R1 Constraints)
 router_settings:
-  routing_strategy: cost-based-routing  # Route to cheapest model when multiple options available
-  num_retries: 3  # Retry failed requests up to 3 times
+  routing_strategy: simple-shuffle  # Simple round-robin, no automatic failover
+  num_retries: 3  # Retry failed requests on same model up to 3 times
   timeout: 120  # Request timeout in seconds
-  
-  # Fallback configuration - if primary model fails, try these alternatives
-  fallbacks:
-    - gpt-4o: ["claude-sonnet-4-5", "gemini-2-5-pro"]
-    - claude-sonnet-4-5: ["gpt-4o", "gemini-2-5-pro"]
-    - gemini-2-5-pro: ["gpt-4o", "claude-sonnet-4-5"]
-  
+
   # Redis for distributed rate limiting across multiple LiteLLM instances
   redis_host: redis
   redis_port: 6379
 
-# LiteLLM Settings - Caching, Compression, Observability
+# LiteLLM Settings - Semantic Caching, Compression, Observability
 litellm_settings:
-  # Enable caching
+  # Enable semantic caching (embedding-based similarity matching)
   cache: true
   cache_params:
-    type: redis
+    type: redis-semantic  # Semantic caching with embedding similarity
     host: redis
     port: 6379
     ttl: 3600  # Cache responses for 1 hour (3600 seconds)
     namespace: "litellm:cache"  # Redis key prefix for organization
+    similarity_threshold: 0.8  # 80% similarity required for cache hit (0.0-1.0)
+    redis_semantic_cache_embedding_model: "text-embedding-ada-002"  # OpenAI embedding model
     supported_call_types: ["acompletion", "atext_completion", "aembedding"]
     max_connections: 100  # Maximum Redis connections in the pool
   

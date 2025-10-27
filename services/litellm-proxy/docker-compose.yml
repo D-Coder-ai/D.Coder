@@ -1,0 +1,88 @@
+# LiteLLM Proxy - Standalone Development Configuration
+# For isolated service development and testing
+# Depends on infrastructure services running from infrastructure/docker-compose.base.yml
+
+networks:
+  dcoder-network:
+    external: true
+    name: dcoder-network
+
+services:
+  # ==================== LiteLLM Proxy Service ====================
+  litellm-proxy:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: dcoder-litellm-proxy-dev
+    restart: unless-stopped
+    depends_on:
+      - postgres-check
+      - redis-check
+    environment:
+      # LLM Provider API Keys
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY}
+      GROQ_API_KEY: ${GROQ_API_KEY}
+
+      # LiteLLM Configuration
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-sk-1234567890}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-dcoder}:${POSTGRES_PASSWORD:-changeme}@dcoder-postgres:5432/litellm
+
+      # Redis Configuration
+      REDIS_HOST: dcoder-redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+
+      # Observability
+      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
+      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
+
+      # Logging
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./config:/app/config:ro
+      - ./middleware:/app/middleware:ro
+    networks:
+      - dcoder-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  # ==================== Dependency Checks ====================
+  # These services verify that required infrastructure is running
+
+  postgres-check:
+    image: postgres:16.2-alpine
+    container_name: dcoder-litellm-postgres-check
+    networks:
+      - dcoder-network
+    command: >
+      sh -c "
+      until pg_isready -h dcoder-postgres -p 5432 -U dcoder; do
+        echo 'Waiting for PostgreSQL to be ready...';
+        sleep 2;
+      done;
+      echo 'PostgreSQL is ready!';
+      "
+    depends_on: []
+
+  redis-check:
+    image: redis:7.2.4-alpine
+    container_name: dcoder-litellm-redis-check
+    networks:
+      - dcoder-network
+    command: >
+      sh -c "
+      until redis-cli -h dcoder-redis -p 6379 ping | grep -q PONG; do
+        echo 'Waiting for Redis to be ready...';
+        sleep 2;
+      done;
+      echo 'Redis is ready!';
+      "
+    depends_on: []

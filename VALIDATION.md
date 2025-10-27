@@ -597,7 +597,669 @@ rm config/kong.yml
 
 ## LiteLLM Proxy
 
-*To be documented when LiteLLM Proxy implementation is complete.*
+LLM Gateway providing multi-provider routing, semantic caching, virtual keys, prompt compression, and observability for all LLM interactions.
+
+### Components
+
+- LiteLLM Proxy (Port 4000)
+- Redis (semantic cache storage)
+- PostgreSQL (virtual keys and usage tracking)
+- Langfuse integration (optional observability)
+- Prometheus metrics endpoint
+
+### Setup
+
+**Prerequisites**: Infrastructure must be running (`make infra-up`)
+
+```bash
+# Navigate to litellm-proxy directory
+cd services/litellm-proxy
+
+# Ensure provider API keys are set in .env
+# OPENAI_API_KEY, ANTHROPIC_API_KEY, GOOGLE_API_KEY, GROQ_API_KEY
+
+# Start LiteLLM Proxy service
+docker-compose up -d
+
+# Wait for service to be healthy (30-40 seconds for database migrations)
+docker-compose ps
+```
+
+### Validation Steps
+
+#### 1. Verify LiteLLM Proxy Status
+
+```bash
+# Check health endpoint
+curl -i http://localhost:4000/health
+
+# Expected: 200 OK
+# {
+#   "status": "healthy",
+#   "version": "1.x.x",
+#   "uptime": "<seconds>"
+# }
+
+# Alternatively using /health/readiness
+curl http://localhost:4000/health/readiness
+
+# Expected: "success"
+```
+
+#### 2. Verify Database and Redis Connectivity
+
+```bash
+# Check LiteLLM logs for successful connections
+docker-compose logs litellm-proxy | grep -i "connected\|database"
+
+# Expected logs:
+# - "Connected to database: postgresql://..."
+# - "Connected to Redis: redis:6379"
+# - "Database migrations completed"
+
+# Verify LiteLLM tables were created
+docker exec dcoder-postgres psql -U dcoder -d litellm -c "\dt"
+
+# Expected tables:
+# - LiteLLM_VerificationToken (virtual keys)
+# - LiteLLM_SpendLogs (usage tracking)
+# - LiteLLM_UserTable (user management)
+# - LiteLLM_TeamTable (team/tenant management)
+```
+
+#### 3. Verify Semantic Caching Configuration
+
+```bash
+# Check Redis connection from LiteLLM container
+docker exec dcoder-litellm-proxy redis-cli -h redis ping
+
+# Expected: "PONG"
+
+# Check Redis for semantic cache namespace
+docker exec dcoder-redis redis-cli KEYS "litellm:cache:*"
+
+# Expected: Empty initially, or existing cache keys if tests have run
+
+# Verify embedding model for semantic caching is accessible
+curl http://localhost:4000/v1/models \
+  -H "Authorization: Bearer $LITELLM_MASTER_KEY" | jq '.data[] | select(.id | contains("embedding"))'
+
+# Expected: text-embedding-ada-002 or configured embedding model
+```
+
+#### 4. Test Virtual Key Generation
+
+```bash
+# Generate a test virtual key with master key
+curl -X POST http://localhost:4000/key/generate \
+  -H "Authorization: Bearer $LITELLM_MASTER_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "user_id": "test-user-001",
+    "team_id": "test-tenant-001",
+    "max_budget": 100.0,
+    "models": ["gpt-4o-mini", "claude-haiku-3-5", "gemini-2-5-flash"],
+    "duration": "30d",
+    "aliases": {"gpt-4o-mini": "fast-model"}
+  }'
+
+# Expected: 200 OK
+# {
+#   "key": "sk-...",
+#   "expires": "2025-11-28T00:00:00Z",
+#   "user_id": "test-user-001",
+#   "team_id": "test-tenant-001",
+#   "max_budget": 100.0,
+#   "models": ["gpt-4o-mini", "claude-haiku-3-5", "gemini-2-5-flash"]
+# }
+
+# Save the generated key for later tests
+export TEST_VIRTUAL_KEY="sk-..."
+```
+
+#### 5. Test Provider Routing (All 4 Providers)
+
+```bash
+# Test OpenAI routing
+curl -X POST http://localhost:4000/v1/chat/completions \
+  -H "Authorization: Bearer $TEST_VIRTUAL_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-4o-mini",
+    "messages": [{"role": "user", "content": "Say OK"}],
+    "max_tokens": 5
+  }'
+
+# Expected: 200 OK with OpenAI response
+# {
+#   "id": "chatcmpl-...",
+#   "model": "gpt-4o-mini",
+#   "choices": [{"message": {"content": "OK"}}],
+#   "usage": {"total_tokens": 10}
+# }
+
+# Test Anthropic routing
+curl -X POST http://localhost:4000/v1/chat/completions \
+  -H "Authorization: Bearer $TEST_VIRTUAL_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "claude-haiku-3-5",
+    "messages": [{"role": "user", "content": "Say OK"}],
+    "max_tokens": 5
+  }'
+
+# Expected: 200 OK with Anthropic response
+
+# Test Google Gemini routing
+curl -X POST http://localhost:4000/v1/chat/completions \
+  -H "Authorization: Bearer $TEST_VIRTUAL_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gemini-2-5-flash",
+    "messages": [{"role": "user", "content": "Say OK"}],
+    "max_tokens": 5
+  }'
+
+# Expected: 200 OK with Gemini response
+
+# Test Groq routing
+curl -X POST http://localhost:4000/v1/chat/completions \
+  -H "Authorization: Bearer $TEST_VIRTUAL_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "groq-llama-3-3-70b",
+    "messages": [{"role": "user", "content": "Say OK"}],
+    "max_tokens": 5
+  }'
+
+# Expected: 200 OK with Groq response
+```
+
+#### 6. Verify Semantic Cache Hit/Miss
+
+```bash
+# Make initial request (cache MISS expected)
+curl -X POST http://localhost:4000/v1/chat/completions \
+  -H "Authorization: Bearer $TEST_VIRTUAL_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-4o-mini",
+    "messages": [{"role": "user", "content": "What is the capital of France?"}],
+    "max_tokens": 20
+  }' -w "\nTime: %{time_total}s\n"
+
+# Expected: 200 OK, response time 1-3 seconds (API call)
+# Record response content
+
+# Make identical request (cache HIT expected)
+curl -X POST http://localhost:4000/v1/chat/completions \
+  -H "Authorization: Bearer $TEST_VIRTUAL_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-4o-mini",
+    "messages": [{"role": "user", "content": "What is the capital of France?"}],
+    "max_tokens": 20
+  }' -w "\nTime: %{time_total}s\n"
+
+# Expected: 200 OK, response time <100ms (cache hit)
+# Response content should match first request
+
+# Test semantic similarity (should also hit cache with 0.8 similarity threshold)
+curl -X POST http://localhost:4000/v1/chat/completions \
+  -H "Authorization: Bearer $TEST_VIRTUAL_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-4o-mini",
+    "messages": [{"role": "user", "content": "What is the capital city of France?"}],
+    "max_tokens": 20
+  }' -w "\nTime: %{time_total}s\n"
+
+# Expected: 200 OK, fast response (semantic cache hit)
+
+# Check Redis for cache entries
+docker exec dcoder-redis redis-cli KEYS "litellm:cache:*" | head -5
+
+# Expected: Cache keys present
+```
+
+#### 7. Test Prompt Compression Middleware
+
+```bash
+# Create large prompt (>500 tokens threshold for compression)
+LARGE_PROMPT=$(python3 -c "print('This is a test context with information. ' * 100)")
+
+curl -X POST http://localhost:4000/v1/chat/completions \
+  -H "Authorization: Bearer $TEST_VIRTUAL_KEY" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"model\": \"gpt-4o-mini\",
+    \"messages\": [
+      {\"role\": \"system\", \"content\": \"You are a helpful assistant.\"},
+      {\"role\": \"user\", \"content\": \"$LARGE_PROMPT\nSummarize this.\"}
+    ],
+    \"max_tokens\": 50
+  }"
+
+# Expected: 200 OK, response generated
+# Check logs for compression metrics
+
+docker-compose logs litellm-proxy | grep -i "compression"
+
+# Expected logs:
+# - "Prompt compression: 850 tokens → 425 tokens (50% reduction)"
+# - "Compression latency: 45ms"
+```
+
+#### 8. Verify Langfuse Observability Integration
+
+```bash
+# Make a tracked request
+curl -X POST http://localhost:4000/v1/chat/completions \
+  -H "Authorization: Bearer $TEST_VIRTUAL_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-4o-mini",
+    "messages": [{"role": "user", "content": "Hello Langfuse!"}],
+    "max_tokens": 10,
+    "metadata": {
+      "trace_name": "test-langfuse-integration",
+      "user_id": "test-user-001"
+    }
+  }'
+
+# Expected: 200 OK
+
+# Check logs for Langfuse callback
+docker-compose logs litellm-proxy | grep -i "langfuse"
+
+# Expected logs:
+# - "Langfuse callback: trace created"
+# - "Langfuse callback: generation logged"
+
+# If LANGFUSE_PUBLIC_KEY is configured, verify in Langfuse UI
+# Navigate to: https://cloud.langfuse.com (or your instance)
+# Search for trace: "test-langfuse-integration"
+```
+
+#### 9. Verify Prometheus Metrics Endpoint
+
+```bash
+# Fetch all metrics
+curl http://localhost:4000/metrics
+
+# Expected: Prometheus format metrics
+# litellm_requests_total{...} 10
+# litellm_request_duration_seconds_bucket{...} 0.5
+# litellm_cache_hit_total{...} 5
+# litellm_cache_miss_total{...} 5
+
+# Check specific metrics
+curl http://localhost:4000/metrics | grep litellm_requests_total
+
+# Expected: Request counter with labels (model, status)
+
+curl http://localhost:4000/metrics | grep litellm_cache
+
+# Expected: Cache hit/miss counters
+# litellm_cache_hit_total
+# litellm_cache_miss_total
+
+curl http://localhost:4000/metrics | grep litellm_compression
+
+# Expected: Compression metrics (if compression occurred)
+# litellm_compression_requests_total
+# litellm_compression_savings_percent
+```
+
+#### 10. Test Rate Limiting Per Virtual Key
+
+```bash
+# Generate virtual key with low rate limit
+curl -X POST http://localhost:4000/key/generate \
+  -H "Authorization: Bearer $LITELLM_MASTER_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "user_id": "rate-test-user",
+    "team_id": "rate-test-tenant",
+    "max_budget": 10.0,
+    "models": ["gpt-4o-mini"],
+    "rpm": 2
+  }'
+
+# Save the key
+export RATE_LIMITED_KEY="sk-..."
+
+# Make rapid requests to trigger rate limit
+for i in {1..5}; do
+  echo "Request $i:"
+  curl -X POST http://localhost:4000/v1/chat/completions \
+    -H "Authorization: Bearer $RATE_LIMITED_KEY" \
+    -H "Content-Type: application/json" \
+    -d '{
+      "model": "gpt-4o-mini",
+      "messages": [{"role": "user", "content": "Hi"}],
+      "max_tokens": 5
+    }' -w "\nStatus: %{http_code}\n\n"
+  sleep 0.5
+done
+
+# Expected: First 2 requests succeed (200), then 429 Too Many Requests
+# Response includes rate limit headers:
+# X-RateLimit-Limit: 2
+# X-RateLimit-Remaining: 0
+# Retry-After: 30
+```
+
+### Integration Tests
+
+#### Test Multi-Provider Fallback (Manual Only - No Auto-Failover in R1)
+
+```bash
+# R1 Constraint: No automatic provider failover
+# Fallback must be tested manually by switching models
+
+# Simulate provider unavailable by using invalid API key temporarily
+# Then manually switch to another provider/model
+
+# Test 1: Try primary model
+curl -X POST http://localhost:4000/v1/chat/completions \
+  -H "Authorization: Bearer $TEST_VIRTUAL_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-4o-mini",
+    "messages": [{"role": "user", "content": "Hello"}]
+  }'
+
+# If fails, manually try fallback model
+curl -X POST http://localhost:4000/v1/chat/completions \
+  -H "Authorization: Bearer $TEST_VIRTUAL_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "claude-haiku-3-5",
+    "messages": [{"role": "user", "content": "Hello"}]
+  }'
+
+# This validates multi-provider support without automatic failover
+```
+
+#### Test Virtual Key Budget Enforcement
+
+```bash
+# Create key with very low budget ($0.10)
+curl -X POST http://localhost:4000/key/generate \
+  -H "Authorization: Bearer $LITELLM_MASTER_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "user_id": "budget-test-user",
+    "team_id": "budget-test-tenant",
+    "max_budget": 0.10,
+    "models": ["gpt-4o-mini"]
+  }'
+
+export BUDGET_KEY="sk-..."
+
+# Make requests until budget is exhausted
+for i in {1..20}; do
+  echo "Request $i:"
+  curl -X POST http://localhost:4000/v1/chat/completions \
+    -H "Authorization: Bearer $BUDGET_KEY" \
+    -H "Content-Type: application/json" \
+    -d '{
+      "model": "gpt-4o-mini",
+      "messages": [{"role": "user", "content": "Count to 5"}],
+      "max_tokens": 20
+    }' -w "\nStatus: %{http_code}\n"
+done
+
+# Expected: Eventually get 429 or 403 when budget exceeded
+# Error message: "Budget exceeded for this key"
+
+# Check key info
+curl http://localhost:4000/key/info \
+  -H "Authorization: Bearer $LITELLM_MASTER_KEY" \
+  -H "Content-Type: application/json" \
+  -d "{\"key\": \"$BUDGET_KEY\"}"
+
+# Expected: Budget usage details
+# {
+#   "key": "sk-...",
+#   "spend": 0.12,
+#   "max_budget": 0.10,
+#   "budget_exceeded": true
+# }
+```
+
+#### Test Streaming Support
+
+```bash
+# Test streaming with virtual key
+curl -N -X POST http://localhost:4000/v1/chat/completions \
+  -H "Authorization: Bearer $TEST_VIRTUAL_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-4o-mini",
+    "messages": [{"role": "user", "content": "Count from 1 to 5"}],
+    "stream": true,
+    "max_tokens": 30
+  }'
+
+# Expected: SSE stream with incremental tokens
+# data: {"id":"chatcmpl-...","choices":[{"delta":{"content":"1"}}]}
+# data: {"id":"chatcmpl-...","choices":[{"delta":{"content":","}}]}
+# ...
+# data: [DONE]
+```
+
+#### Load Test Semantic Cache Performance
+
+```bash
+# Install Apache Bench if needed
+# apt-get install apache2-utils  # Ubuntu/Debian
+# brew install httpd             # macOS
+
+# Create test payload file
+cat > /tmp/llm_request.json <<EOF
+{
+  "model": "gpt-4o-mini",
+  "messages": [{"role": "user", "content": "What is 2+2?"}],
+  "max_tokens": 10
+}
+EOF
+
+# First run: Populate cache (1 request)
+curl -X POST http://localhost:4000/v1/chat/completions \
+  -H "Authorization: Bearer $TEST_VIRTUAL_KEY" \
+  -H "Content-Type: application/json" \
+  -d @/tmp/llm_request.json
+
+# Wait for cache write
+sleep 2
+
+# Load test with cached query (100 requests, 10 concurrent)
+ab -n 100 -c 10 -p /tmp/llm_request.json -T application/json \
+  -H "Authorization: Bearer $TEST_VIRTUAL_KEY" \
+  http://localhost:4000/v1/chat/completions
+
+# Expected results:
+# - 100% success rate (200 responses)
+# - Mean response time: <100ms (all cache hits)
+# - Requests per second: >100
+
+# Compare with uncached query
+cat > /tmp/llm_request_unique.json <<EOF
+{
+  "model": "gpt-4o-mini",
+  "messages": [{"role": "user", "content": "Random: $RANDOM"}],
+  "max_tokens": 10
+}
+EOF
+
+# This will be slower as each request is unique (cache MISS)
+```
+
+### Performance Benchmarks
+
+Expected performance metrics for LiteLLM Proxy operations:
+
+- **Cache Hit Latency**: <50ms (P95)
+- **Cache Miss Latency**: 500-3000ms (depends on provider)
+- **Semantic Cache Match**: 80%+ similarity threshold
+- **Prompt Compression Overhead**: <50ms for 1000 tokens
+- **Compression Ratio**: 2-3x (50-66% reduction)
+- **Virtual Key Validation**: <10ms
+- **Rate Limit Check**: <5ms
+- **Total Gateway Overhead**: <100ms (cache hit)
+
+Cost Reduction Targets:
+- **Semantic Caching**: 40-60% token reduction
+- **Prompt Compression**: 20-30% additional savings
+- **Combined Target**: 70%+ total cost reduction
+
+### Troubleshooting
+
+**LiteLLM won't start**:
+```bash
+# Check logs for errors
+docker-compose logs litellm-proxy
+
+# Common issues:
+# 1. Database connection failed
+docker exec dcoder-postgres pg_isready -U dcoder
+
+# 2. Redis connection failed
+docker exec dcoder-redis redis-cli ping
+
+# 3. Invalid API keys (will start but requests fail)
+docker-compose logs litellm-proxy | grep -i "authentication\|api key"
+
+# 4. Configuration syntax error
+docker exec dcoder-litellm-proxy cat /app/config/litellm_config.yaml | python -m yaml
+```
+
+**Provider requests failing**:
+```bash
+# Check provider API key is set
+docker exec dcoder-litellm-proxy env | grep -E "OPENAI|ANTHROPIC|GOOGLE|GROQ"
+
+# Expected: API keys present (not empty)
+
+# Test provider directly (bypass LiteLLM)
+curl https://api.openai.com/v1/models \
+  -H "Authorization: Bearer $OPENAI_API_KEY"
+
+# If direct test fails, API key is invalid
+
+# Check LiteLLM logs for provider errors
+docker-compose logs litellm-proxy | grep -i "error\|failed"
+```
+
+**Semantic caching not working**:
+```bash
+# Verify Redis semantic cache keys
+docker exec dcoder-redis redis-cli KEYS "litellm:cache:*"
+
+# Check if embedding model is accessible
+curl -X POST http://localhost:4000/v1/embeddings \
+  -H "Authorization: Bearer $LITELLM_MASTER_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "text-embedding-ada-002",
+    "input": "test"
+  }'
+
+# Expected: 200 OK with embeddings
+
+# Check configuration
+docker exec dcoder-litellm-proxy cat /app/config/litellm_config.yaml | grep -A 10 "cache_params"
+
+# Verify similarity_threshold is set (0.8 default)
+```
+
+**Virtual keys not working**:
+```bash
+# Check database connection
+docker exec dcoder-postgres psql -U dcoder -d litellm -c "SELECT * FROM \"LiteLLM_VerificationToken\" LIMIT 5;"
+
+# Verify master key is correct
+echo $LITELLM_MASTER_KEY
+
+# Check key generation endpoint directly
+curl -X POST http://localhost:4000/key/generate \
+  -H "Authorization: Bearer $LITELLM_MASTER_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"user_id": "test"}' -v
+
+# If 401: Master key is wrong
+# If 500: Database issue
+```
+
+**Prompt compression not activating**:
+```bash
+# Compression only activates for prompts >500 tokens
+# Check if prompt is large enough
+
+# Check middleware is loaded
+docker-compose logs litellm-proxy | grep -i "middleware\|compression"
+
+# Expected: "Loaded middleware: prompt_compression_middleware"
+
+# Verify middleware file exists
+docker exec dcoder-litellm-proxy ls -la /app/middleware/
+
+# Expected: prompt_compression.py present
+
+# Check PYTHONPATH includes middleware
+docker exec dcoder-litellm-proxy env | grep PYTHONPATH
+
+# Expected: PYTHONPATH includes /app/middleware
+```
+
+**Prometheus metrics not available**:
+```bash
+# Check /metrics endpoint
+curl -I http://localhost:4000/metrics
+
+# Expected: 200 OK
+
+# If 404, check LiteLLM version (metrics added in v1.x)
+docker exec dcoder-litellm-proxy python -c "import litellm; print(litellm.__version__)"
+
+# Check Prometheus callback is configured
+docker exec dcoder-litellm-proxy cat /app/config/litellm_config.yaml | grep -i prometheus
+
+# Expected: "success_callback: ["langfuse", "prometheus"]"
+```
+
+**High latency on cache hits**:
+```bash
+# Check Redis performance
+docker exec dcoder-redis redis-cli --latency
+
+# Expected: <1ms average latency
+
+# Check Redis memory usage
+docker exec dcoder-redis redis-cli INFO memory | grep used_memory_human
+
+# If high, may need to adjust cache TTL or max memory
+
+# Check network latency between containers
+docker exec dcoder-litellm-proxy ping -c 5 dcoder-redis
+
+# Expected: <1ms average
+```
+
+### Clean Up
+
+```bash
+# Stop LiteLLM Proxy service
+docker-compose down
+
+# Remove volumes (optional - deletes virtual keys and usage data)
+docker-compose down -v
+
+# Clear Redis cache manually (without removing volumes)
+docker exec dcoder-redis redis-cli FLUSHDB
+```
 
 ---
 
