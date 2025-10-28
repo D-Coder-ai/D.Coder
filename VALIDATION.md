@@ -67,6 +67,10 @@ This document provides setup instructions, validation steps, and test procedures
    MINIO_ROOT_USER=minioadmin
    MINIO_ROOT_PASSWORD=<secure-password>
 
+   # LiteLLM Proxy Configuration
+   LITELLM_MASTER_KEY=sk-1234567890abcdef  # Master key for virtual key management
+   DATABASE_URL=postgresql://dcoder:<password>@postgres:5432/litellm
+
    # LLM Provider API Keys (for LiteLLM Proxy)
    OPENAI_API_KEY=sk-...
    ANTHROPIC_API_KEY=sk-ant-...
